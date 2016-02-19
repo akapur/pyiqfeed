@@ -8,14 +8,14 @@ from typing import Sequence
 
 def read_float(float_str: str) -> float:
     if float_str != "":
-        return float(str)
+        return float(float_str)
     else:
         return None
 
 
 def read_int(int_str: str) -> int:
     if int_str != "":
-        return int(str)
+        return int(int_str)
     else:
         return None
 
@@ -61,9 +61,9 @@ def int_to_str(val: int) -> str:
         return ""
 
 
-def time_to_hhmmss(time: datetime.time) -> str:
-    if time is not None:
-        return "%.2d%.2d%.2d" % (flt.hour, flt.minute, flt.second)
+def time_to_hhmmss(tm: datetime.time) -> str:
+    if tm is not None:
+        return "%.2d%.2d%.2d" % (tm.hour, tm.minute, tm.second)
     else:
         return ""
 
@@ -85,9 +85,12 @@ def datetime_to_yyyymmdd_hhmmss(dt_tm: datetime.datetime) -> str:
 class FeedConn:
 
     host = "127.0.0.1"
+    quote_port = 5009
     lookup_port = 9100
     depth_port = 9200
+    admin_conn = 9300
     deriv_port = 9400
+    port = quote_port
     protocol = "5.2"
 
     def __init__(self, name: str, host: str, port: int):
@@ -118,8 +121,8 @@ class FeedConn:
         self._port = port
         self._sock.connect((host, port))
         self.set_protocol(FeedConn.protocol)
-        self.send_connect_message()
         self.set_client_name(self._name)
+        self.send_connect_message()
 
     def disconnect(self) -> None:
         self.stop_runner()
@@ -160,36 +163,40 @@ class FeedConn:
         self._sm_dict["STATS"] = self.process_conn_stats
 
     def read_messages(self):
-        ready_list = select.select([self._sock], [], [self._sock], 30)
+        ready_list = select.select([self._sock], [], [self._sock], 5)
         if ready_list[2]:
             raise RuntimeError("There was a problem with the socket for QuoteReader: %s," % self._name)
         if ready_list[0]:
             with self._buf_lock:
-                self._recv_buf += self._sock.recv(16384).decode()
+                data_recvd = self._sock.recv(16384).decode()
+                self._recv_buf += data_recvd
 
-    @property
-    def recvd_messages(self):
+    def next_message(self):
         with self._buf_lock:
             next_delim = self._recv_buf.find('\n')
             if next_delim != -1:
                 message = self._recv_buf[:next_delim].strip()
                 self._recv_buf = self._recv_buf[(next_delim + 1):]
-                yield message
+                return message
+            else:
+                return ""
 
     def process_messages(self):
         with self._buf_lock:
-            for message in self.recvd_messages:
+            message = self.next_message()
+            while "" != message:
                 dispatch_func = self._pf_dict[message[0]]
                 dispatch_func(message)
+                message = self.next_message()
 
     def process_system_message(self, msg: str) -> None:
         assert msg[0:2] == "S,"
         has_param = False
         param_str = ""
-        msg_name_delim = msg.find(',')
+        msg_name_delim = msg.find(',', 2)
         if (-1 != msg_name_delim) and (len(msg) > (msg_name_delim + 2)):
             has_param = True
-            param_str = msg[(1 + msg_name_delim):]
+            param_str = msg[(1+msg_name_delim):]
         if -1 == msg_name_delim:
             msg_name_delim = len(msg)
         msg_name = msg[2:msg_name_delim]
@@ -199,32 +206,40 @@ class FeedConn:
         else:
             processing_func()
 
-    def process_current_protocol(self, protocol: str) -> None:
+    def process_current_protocol(self, protocol_str: str) -> None:
+        protocol_end = protocol_str.find(',')
+        if protocol_end != -1:
+            protocol = protocol_str[:protocol_end]
+        else:
+            protocol = protocol_str
         if protocol != FeedConn.protocol:
             raise RuntimeError("Desired Protocol %s, Server Says Protocol %s" % (FeedConn.protocol, protocol))
         for listener in self._listeners:
             listener.process_current_protocol(protocol)
 
     def process_server_disconnected(self) -> None:
+        print("process_server_disconnected")
         for listener in self._listeners:
             listener.process_server_disconnected()
 
     def process_server_connected(self) -> None:
+        print("process_server_connected")
         for listener in self._listeners:
             listener.process_server_connected()
 
     def process_reconnect_failed(self) -> None:
+        print("process_reconnect_failed")
         for listener in self._listeners:
             listener.process_reconnect_failed()
 
     def process_conn_stats(self, msg: str) -> None:
-        (server_ip, server_port_str, max_sym_str, num_sym_str, num_clients_str,
+        [server_ip, server_port_str, max_sym_str, num_sym_str, num_clients_str,
          secs_since_update_str, num_reconn_str, num_fail_conn_str,
          conn_tm_str, mkt_tm_str, status_str, feed_version, login,
          kbs_recv_str, kbps_recv_str, avg_kbps_recv_str,
-         kbs_sent_str, kbps_sent_str, avg_kbps_sent_str) = msg[7:].split(",")
-        conn_tm = time.strptime("%s EST" % conn_tm_str, "%b %d %I:%M%p %Z")
-        mkt_tm = time.strptime("%s EST" % mkt_tm_str, "%b %d %I:%M%p %Z")
+         kbs_sent_str, kbps_sent_str, avg_kbps_sent_str, junk] = msg.split(",")
+        conn_tm = time.strptime(conn_tm_str, "%b %d %I:%M%p")
+        mkt_tm = time.strptime(mkt_tm_str, "%b %d %I:%M%p")
         status = False
         if status_str == "Connected":
             status = True
@@ -243,12 +258,14 @@ class FeedConn:
             listener.process_conn_stats(conn_stats)
 
     def process_timestamp(self, msg: str) -> None:
+        print("process_timestamp: %s" % msg)
         assert msg[0:2] == 'T,'
         time_val = time.strptime("%s EST" % msg[2:], "%Y%m%d %H:%M:%S %Z")
         for listener in self._listeners:
             listener.process_timestamp(time_val)
 
     def process_error(self, msg: str) -> None:
+        print("process_error: %s" % msg)
         assert msg[0:2] == 'E,'
         for listener in self._listeners:
             listener.process_error(msg[2:])
@@ -265,20 +282,23 @@ class FeedConn:
         self.send_cmd("S,SET PROTOCOL,%s\r\n" % protocol)
 
     def send_connect_message(self) -> None:
-        self.send_cmd("S,CONNECT\r\n")
+        msg = "S,CONNECT\r\n"
+        self.send_cmd(msg)
 
     def send_disconnect_message(self) -> None:
         self.send_cmd("S,DISCONNECT\r\n")
 
     def set_client_name(self, name) -> None:
         self._name = name
-        self.send_cmd("S,SET CLIENT NAME,%s\r\n" % name)
+        msg = "S,SET CLIENT NAME,%s\r\n" % name
+        self.send_cmd(msg)
 
 
 class QuoteConn(FeedConn):
+    host = "127.0.0.1"
     port = 5009
 
-    def __init__(self, name, host, port):
+    def __init__(self, name:str = "QuoteConn", host: str = host, port: int = port):
         super().__init__(name, host, port)
         self._fundamental_fields = []
         self._update_fields = []
@@ -304,11 +324,13 @@ class QuoteConn(FeedConn):
         self._sm_dict["CURRENT UPDATE FIELDNAMES"] = self.process_current_update_fieldnames
 
     def process_invalid_symbol(self, msg: str) -> None:
+        print("process_invalid_symbol: %s" % msg)
         assert msg[0:2] == "n,"
         for listener in self._listeners:
             listener.process_no_symbol_error(msg[2:])
 
     def process_news(self, msg):
+        print("process_news: %s" % msg)
         assert msg[0:2] == "N,"
         (N, distributor, story_id, symbol_list, story_time, headline) = msg.split(',')
         story_time = read_yyyymmdd_hhmmss(story_time)
@@ -321,6 +343,7 @@ class QuoteConn(FeedConn):
             listener.process_news(news_dict)
 
     def process_regional_quote(self, msg):
+        print("process_regional_quote: %s" % msg)
         assert msg[0:2] == "R,"
         (R, sym, exch_dep,
          bid_reg, bid_sz_reg, bid_tm_reg, ask_reg, ask_sz_reg, ask_tm_reg,
@@ -340,12 +363,14 @@ class QuoteConn(FeedConn):
             listener.process_regional_quote(reg_dict)
 
     def process_summary(self, msg: str) -> None:
+        print("process_summary: %s" % msg)
         assert msg[0:2] == "P,"
         update_dict = self.create_update_dict(msg)
         for listener in self._listeners:
             listener.process_summary(update_dict)
 
     def process_update(self, msg: str) -> None:
+        print("process_update: %s" % msg)
         assert msg[0:2] == "Q,"
         update_dict = self.create_update_dict(msg)
         for listener in self._listeners:
@@ -360,6 +385,7 @@ class QuoteConn(FeedConn):
         return update_dict
 
     def process_fundamentals(self, msg):
+        print("process_fundamentals: %s" % msg)
         assert msg[0:2] == "F,"
         (f,
          symbol, exch_id_dep,
@@ -464,14 +490,17 @@ class QuoteConn(FeedConn):
             listener.process_fundamentals(fund_msg)
 
     def process_auth_key(self, auth_key) -> None:
+        print("process_auth_key: %s" % msg)
         for listener in self._listeners:
             listener.process_auth_key(auth_key)
 
     def process_keyok(self) -> None:
+        print("process_keyok: %s" % msg)
         for listener in self._listeners:
             listener.process_keyok()
 
     def process_customer_info(self, msg: str) -> None:
+        print("process_customer_info: %s" % msg)
         (svc_t_str, ip_add, port_str, token, version, dep_1, rt_exchanges, dep_2, max_sym_str, flags, dep_3,
          dep_4) = msg.split(",")
         svc_t = (svc_t_str == "real_time")
@@ -484,26 +513,31 @@ class QuoteConn(FeedConn):
             listener.process_customer_info(msg_dict)
 
     def process_symbol_limit_reached(self, sym: str) -> None:
+        print("process_symbol_limit_reached: %s" % msg)
         for listener in self._listeners:
             listener.process_symbol_limit_reached(sym)
 
     def process_ip_addresses_used(self, addresses: str) -> None:
+        print("process_ip_addresses_used: %s" % msg)
         for listener in self._listeners:
             listener.process_ip_addresses_used(addresses)
 
     def process_fundamental_fieldnames(self, msg: str) -> None:
+        print("process_fundamental_fieldnames: %s" % msg)
         fields = msg.split(',')
         self._fundamental_fields = fields
         for listener in self._listeners:
             listener.process_fundamental_fieldnames(fields)
 
     def process_all_update_fieldnames(self, msg: str) -> None:
+        print("process_all_update_fieldnames: %s" % msg)
         fields = msg.split(',')
         self._all_update_fields = fields
         for listener in self._listeners:
             listener.process_all_update_fieldnames(fields)
 
     def process_current_update_fieldnames(self, msg: str) -> None:
+        print("process_current_update_fieldnames: %s" % msg)
         fields = msg.split(',')
         for listener in self._listeners:
             listener.process_current_update_fieldnames(fields)

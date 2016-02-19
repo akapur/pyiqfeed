@@ -2,7 +2,6 @@ import time
 import os
 
 
-
 class FeedService:
 
     def __init__(self, product: str, version: str, login: str, password: str, autoconnect: bool, savelogininfo: bool):
@@ -40,3 +39,7 @@ class FeedService:
                 "password": self.password,
                 "autoconnect": self.autoconnect}
 
+
+if __name__ == "__main__":
+    feed = FeedService(product = "ASHWIN_KAPUR_11966", version="DebuggingLibInIDE", login="451945", password="b2vmxdvs", autoconnect=True, savelogininfo=True)
+    feed.launch()
