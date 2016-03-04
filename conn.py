@@ -6,7 +6,7 @@ import time
 import itertools
 import numpy as np
 from collections import deque, namedtuple
-from typing import Sequence, Callable, Tuple
+from typing import Sequence, List, Callable, Tuple
 
 
 def blob_to_str(val) -> str:
@@ -319,7 +319,6 @@ class FeedConn:
         if ready_list[0]:
             with self._buf_lock:
                 data_recvd = self._sock.recv(16384).decode()
-                print("Data recvd in read_messages:")
                 print(data_recvd)
                 self._recv_buf += data_recvd
                 return True
@@ -339,7 +338,6 @@ class FeedConn:
         with self._buf_lock:
             message = self.next_message()
             while "" != message:
-                print("Processing message: %s" % message)
                 fields = message.split(',')
                 handle_func = self.processing_function(fields)
                 handle_func(fields)
@@ -1487,7 +1485,6 @@ class TableConn(FeedConn):
         # The lookup/history socket does not accept connect messages
         pass
 
-
     def processing_function(self, fields: Sequence[str]) -> Callable[[Sequence[str]], None]:
         if fields[0].isdigit():
             return self.process_table_entry
@@ -1497,19 +1494,21 @@ class TableConn(FeedConn):
             return super().processing_function(fields)
 
     def process_table_entry(self, fields: Sequence[str]) -> None:
+        assert fields[0].isdigit()
         self._current_deque.append(fields)
 
     def process_table_end(self, fields: Sequence[str]) -> None:
+        assert fields[0] == "!ENDMSG!"
         self._current_event.set()
 
     def update_tables(self):
         self.start_runner()
         with self._update_lock:
-            # self.update_markets()
+            self.update_markets()
             self.update_security_types()
-            # self.update_trade_conditions()
-            # self.update_sic_codes()
-            # self.update_naic_codes()
+            self.update_trade_conditions()
+            self.update_sic_codes()
+            self.update_naic_codes()
             self._lookup_done = True
         self.stop_runner()
 
@@ -1549,14 +1548,13 @@ class TableConn(FeedConn):
                 self.markets = np.empty(num_pts, TableConn.mkt_type)
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
-                    [mkt_id_str,
-                     short_name_str, name_str,
-                     group_id_str, group_str] = self._current_deque.popleft()
-                    self.markets[line_num]['mkt_id'] = read_uint64(mkt_id_str)
-                    self.markets[line_num]['short_name'] = short_name_str
-                    self.markets[line_num]['name'] = name_str
-                    self.markets[line_num]['group_id'] = read_uint64(group_id_str)
-                    self.markets[line_num]['group'] = group_str
+                    data_list = self._current_deque.popleft()
+                    print(data_list)
+                    self.markets[line_num]['mkt_id'] = read_uint64(data_list[0])
+                    self.markets[line_num]['short_name'] = data_list[1]
+                    self.markets[line_num]['name'] = data_list[2]
+                    self.markets[line_num]['group_id'] = read_uint64(data_list[3])
+                    self.markets[line_num]['group'] = data_list[4]
                     line_num += 1
                     if line_num >= num_pts:
                         assert len(self._current_deque) == 0
@@ -1576,10 +1574,11 @@ class TableConn(FeedConn):
                 self.security_types = np.empty(num_pts, TableConn.security_type)
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
-                    [sec_type_str, short_name_str, name_str] = self._current_deque.popleft()
-                    self.security_types[line_num]['sec_type'] = read_uint64(sec_type_str)
-                    self.security_types[line_num]['short_name'] = short_name_str
-                    self.security_types[line_num]['name'] = name_str
+                    data_list = self._current_deque.popleft()
+                    [sec_type_str, short_name_str, name_str, junk] = data_list
+                    self.security_types[line_num]['sec_type'] = read_uint64(data_list[0])
+                    self.security_types[line_num]['short_name'] = data_list[1]
+                    self.security_types[line_num]['name'] = data_list[2]
                     line_num += 1
                     if line_num >= num_pts:
                         assert len(self._current_deque) == 0
@@ -1599,10 +1598,10 @@ class TableConn(FeedConn):
                 self.trade_conds = np.empty(num_pts, TableConn.tcond_type)
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
-                    [tcond_id_str, short_name_str, name_str] = self._current_deque.popleft()
-                    self.trade_conds[line_num]['tcond_id'] = read_uint64(tcond_id_str)
-                    self.trade_conds[line_num]['short_name'] = short_name_str
-                    self.trade_conds[line_num]['name'] = name_str
+                    data_list = self._current_deque.popleft()
+                    self.trade_conds[line_num]['tcond_id'] = read_uint64(data_list[0])
+                    self.trade_conds[line_num]['short_name'] = data_list[1]
+                    self.trade_conds[line_num]['name'] = data_list[2]
                     line_num += 1
                     if line_num >= num_pts:
                         assert len(self._current_deque) == 0
@@ -1622,9 +1621,10 @@ class TableConn(FeedConn):
                 self.sics = np.empty(num_pts, TableConn.sic_type)
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
-                    [sic_str, name_str] = self._current_deque.popleft()
-                    self.sics[line_num]['sic'] = read_uint64(sic_str)
-                    self.sics[line_num]['name'] = name_str
+                    data_list = self._current_deque.popleft()
+                    print(data_list)
+                    self.sics[line_num]['sic'] = read_uint64(data_list[0])
+                    self.sics[line_num]['name'] = ",".join(data_list[1:])
                     line_num += 1
                     if line_num >= num_pts:
                         assert len(self._current_deque) == 0
@@ -1641,12 +1641,12 @@ class TableConn(FeedConn):
             self._current_event.wait(120)
             if self._current_event.is_set():
                 num_pts = len(self._current_deque)
-                self.naics = np.empty(num_pts, TableConn.sic_type)
+                self.naics = np.empty(num_pts, TableConn.naic_type)
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
-                    [naic_str, name_str] = self._current_deque.popleft()
-                    self.naics[line_num]['naic'] = read_uint64(naic_str)
-                    self.sics[line_num]['name'] = name_str
+                    data_list = self._current_deque.popleft()
+                    self.naics[line_num]['naic'] = read_uint64(data_list[0])
+                    self.naics[line_num]['name'] = ",".join(data_list[1:])
                     line_num += 1
                     if line_num >= num_pts:
                         assert len(self._current_deque) == 0
@@ -1659,9 +1659,9 @@ if __name__ == "__main__":
     from service import FeedService
     from passwords import dtn_login, dtn_password, dtn_product_id
 
-    # svc = FeedService(product=dtn_product_id, version="Debugging", login=dtn_login, password=dtn_password,
-    #                   autoconnect=True, savelogininfo=True)
-    # svc.launch()
+    svc = FeedService(product=dtn_product_id, version="Debugging", login=dtn_login, password=dtn_password,
+                      autoconnect=True, savelogininfo=True)
+    svc.launch()
 
     # admin_conn = AdminConn(name="RunningInIde")
     # admin_conn.start_runner()
@@ -1736,5 +1736,6 @@ if __name__ == "__main__":
     print(table_conn.get_markets())
     print(table_conn.get_security_types())
     print(table_conn.get_trade_conditions())
-    print(table_conn.get_naic_codes())
     print(table_conn.get_sic_codes())
+    print(table_conn.get_naic_codes())
+
