@@ -12,8 +12,6 @@ class FeedService:
         self.autoconnect = autoconnect
         self.savelogininfo = savelogininfo
         self.launch_msg_printed = False
-        self.admin_conns = {}
-        self.quote_conns = {}
 
     def launch(self) -> None:
         iqfeed_args = "-product %s -version %s, -login %s -password %s" % (self.product, self.version, self.login,
@@ -31,7 +29,7 @@ class FeedService:
             iqfeed_call = "/port/bin/wine iqconnect.exe %s" % iqfeed_args
             subprocess.Popen(iqfeed_call, shell=True,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(5)
+            time.sleep(5)
 
     def admin_variables(self):
         return {"product": self.product,

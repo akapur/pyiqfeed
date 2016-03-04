@@ -3,93 +3,162 @@ import socket
 import threading
 import datetime
 import time
+import itertools
 import numpy as np
 from typing import Sequence, Callable
 
 
-def read_float(float_str: str) -> float:
-    if float_str != "":
-        return float(float_str)
+def read_market_open(field: str) -> bool:
+    bool(int(field)) if field != "" else False
+
+
+def read_short_restricted(field: str) -> bool:
+    if field != "":
+        if field == 'Y':
+            return True
+        if field == 'N':
+            return False
+        else:
+            raise RuntimeError("Unknown Value in Short Restricted Field: %s" % field)
     else:
-        return None
+        return False
 
 
-def read_int(int_str: str) -> int:
-    if int_str != "":
-        return int(int_str)
+def read_tick_direction(field: str) -> np.int8:
+    if field != "":
+        field_as_int = int(field)
+        if field_as_int == 173:
+            return 1
+        if field_as_int == 175:
+            return -1
+        if field_as_int == 183:
+            return 0
+        else:
+            raise RuntimeError("Unknown value in Tick Direction Field: %s" % field)
     else:
-        return None
+        return 0
 
 
-def read_hhmmss(hhmmss: str) -> datetime.time:
-    if hhmmss != "":
-        tm = time.strptime(hhmmss, "%H:%M:%S")
-        return datetime.time(tm.tm_hour, tm.tm_min, tm.tm_sec)
-    else:
-        return None
+def read_int(field: str) -> int:
+    return int(field) if field != "" else 0
 
 
-def read_mm_dd_yyyy(date_str: str) -> datetime.date:
-    if date_str != "":
-        timestamp = time.strptime(date_str, "%m/%d/%Y")
-        return datetime.date.fromtimestamp(timestamp)
-    else:
-        return None
+def read_hex(field: str) -> int:
+    return int(field, 16) if field != "" else 0
 
 
-def read_yyyymmdd_hhmmss(dttm: str) -> datetime.datetime:
-    if dttm != "":
-        return time.strptime(dttm, "%Y%m%d %H%M%S")
-    else:
-        return None
+def read_uint8(field: str) -> np.uint8:
+    return np.uint8(field) if field != "" else 0
 
 
+def read_uint16(field: str) -> np.uint16:
+    return np.uint16(field) if field != "" else 0
+
+
+def read_uint64(field: str) -> np.uint64:
+    return np.uint64(field) if field != "" else 0
+
+
+def read_float(field: str) -> float:
+    return float(field) if field != "" else float('nan')
+
+
+def read_float64(field: str) -> np.float64:
+    return np.float64(field) if field != "" else np.nan
+
+
+# def read_hhmmss(hhmmss: str) -> datetime.time:
+#     if hhmmss != "":
+#         tm = time.strptime(hhmmss, "%H:%M:%S")
+#         return datetime.time(tm.tm_hour, tm.tm_min, tm.tm_sec)
+#     else:
+#         return None
+#
+#
+# def read_mm_dd_yyyy(date_str: str) -> datetime.date:
+#     if date_str != "":
+#         timestamp = time.strptime(date_str, "%m/%d/%Y")
+#         return datetime.date.fromtimestamp(timestamp)
+#     else:
+#         return None
+#
+#
+# def read_yyyymmdd_hhmmss(dttm: str) -> datetime.datetime:
+#     if dttm != "":
+#         return time.strptime(dttm, "%Y%m%d %H%M%S")
+#     else:
+#         return None
+#
+#
 def read_split_string(split_str: str) -> tuple:
+    split_fld_0, split_fld_1 = ("", "")
     if split_str != "":
-        (split_factor, split_date) = split_str.split(' ')
-        split_factor = read_float(split_factor)
-        split_date = read_mm_dd_yyyy(split_date)
-        split_data = (split_factor, split_date)
-    else:
-        split_data = (None, None)
+        (split_fld_0, split_fld_1) = split_str.split(' ')
+    split_factor = read_float64(split_fld_0)
+    split_date = read_mmddccyy(split_fld_1)
+    split_data = (split_factor, split_date)
     return split_data
 
 
-def int_to_str(val: int) -> str:
+def read_hhmmss(field: str) -> int:
+    if field != "":
+        hour = int(field[0:2])
+        minute = int(field[3:5])
+        second = int(field[6:8])
+        msecs_since_midnight = 1000000 * ((3600*hour) + (60*minute) + second)
+        return msecs_since_midnight
+    else:
+        return 0
+
+
+def read_hhmmssmil(field: str) -> int:
+    if field != "":
+        hour = int(field[0:2])
+        minute = int(field[3:5])
+        second = int(field[6:8])
+        msecs = int(field[9:])
+        msecs_since_midnight = (1000000 * ((3600*hour) + (60*minute) + second)) + msecs
+        return msecs_since_midnight
+    else:
+        return 0
+
+
+def read_mmddccyy(field: str) -> np.datetime64:
+    if field != "":
+        month = int(field[0:2])
+        day = int(field[3:5])
+        year = int(field[6:10])
+        return np.datetime64(datetime.date(year=year, month=month, day=day), 'D')
+    else:
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
+
+
+def str_or_blank(val) -> str:
     if val is not None:
         return str(val)
     else:
         return ""
 
 
-def time_to_hhmmss(tm: datetime.time) -> str:
-    if tm is not None:
-        return "%.2d%.2d%.2d" % (tm.hour, tm.minute, tm.second)
-    else:
-        return ""
-
-
-def date_to_yyyymmdd(dt: datetime.date) -> str:
-    if dt is not None:
-        return "%.4d%.2d%.2d" % (dt.year, dt.month, dt.day)
-    else:
-        return ""
-
-
-def datetime_to_yyyymmdd_hhmmss(dt_tm: datetime.datetime) -> str:
-    if dt_tm is not None:
-        return "%.4d%.2d%.2d %.2d%.2d%.2d" % (dt_tm.year, dt_tm.month, dt_tm.day, dt_tm.hour, dt_tm.minute, dt_tm.second)
-    else:
-        return ""
-
-
-def hh_mm_ss_to_secs_since_midnight(tm_str: str) -> int:
-    hour = int(tm_str[0:2])
-    minute = int(tm_str[3:5])
-    second = int(tm_str[6:8])
-    secs_since_midnight = (3600*hour) + (60 * minute) + second
-    return secs_since_midnight
-
+# def time_to_hhmmss(tm: datetime.time) -> str:
+#     if tm is not None:
+#         return "%.2d%.2d%.2d" % (tm.hour, tm.minute, tm.second)
+#     else:
+#         return ""
+#
+#
+# def date_to_yyyymmdd(dt: datetime.date) -> str:
+#     if dt is not None:
+#         return "%.4d%.2d%.2d" % (dt.year, dt.month, dt.day)
+#     else:
+#         return ""
+#
+#
+# def datetime_to_yyyymmdd_hhmmss(dt_tm: datetime.datetime) -> str:
+#     if dt_tm is not None:
+#         return "%.4d%.2d%.2d %.2d%.2d%.2d" % (dt_tm.year, dt_tm.month, dt_tm.day, dt_tm.hour, dt_tm.minute, dt_tm.second)
+#     else:
+#         return ""
 
 class FeedConn:
 
@@ -141,7 +210,7 @@ class FeedConn:
         self.stop_runner()
         self._sock.close()
 
-    def start_runner(self):
+    def start_runner(self) -> None:
         self._stop = False
         if not self._started:
             self._read_thread.start()
@@ -156,13 +225,10 @@ class FeedConn:
     def running(self) -> bool:
         return self._read_thread.is_alive()
 
-    def iqfeed_protocol(self):
-        return FeedConn.protocol
-
-    def connected(self):
+    def connected(self) -> bool:
         return self._connected
 
-    def reconnect_failed(self):
+    def reconnect_failed(self) -> bool:
         return self._reconnect_failed
 
     def __call__(self):
@@ -207,12 +273,13 @@ class FeedConn:
         with self._buf_lock:
             message = self.next_message()
             while "" != message:
+                print("Message: %s" % message)
                 fields = message.split(',')
                 handle_func = self.processing_function(fields)
                 handle_func(fields)
                 message = self.next_message()
 
-    def processing_function(self, fields) -> Callable[Sequence[str], type(None)]:
+    def processing_function(self, fields) -> None:
         pf = self._pf_dict.get(fields[0])
         if pf is not None:
             return pf
@@ -228,7 +295,7 @@ class FeedConn:
         processing_func = self.system_processing_function(fields)
         processing_func(fields)
 
-    def system_processing_function(self, fields):
+    def system_processing_function(self, fields) -> Callable[[Sequence[str]], None]:
         assert len(fields) > 1
         assert fields[0] == "S"
         spf = self._sm_dict.get(fields[1])
@@ -335,16 +402,148 @@ class FeedConn:
 class QuoteConn(FeedConn):
     port = 5009
 
-    regional_type = np.dtype([('ticker', 'S64'),
-                              ('rgn_bid', 'f8'), ('rgn_bid_sz', 'u8'), ('rgn_bid_tm', 'u4'),
-                              ('rgn_ask', 'f8'), ('rgn_ask_sz', 'u8'), ('rgn_ask_tm', 'u4'),
-                              ('mkt_center', 'u1'),
-                              ('display_type', 'u1'), ('precision', 'u2')])
+    regional_type = np.dtype([('Symbol', 'S64'),
+                              ('Regional Bid', 'f8'), ('Regional BidSize', 'u8'), ('Regional BidTime', 'u8'),
+                              ('Regional Ask', 'f8'), ('Regional AskSize', 'u8'), ('Regional AskTime', 'u8'),
+                              ('Market Center', 'u1'),
+                              ('Fraction Display Code', 'u1'), ('Decimal Precision', 'u2')])
+
+    fundamental_fields = ["Symbol", "Exchange ID", "PE", "Average Volume",
+                          "52 Week High", "52 Week Low",
+                          "Calendar Year High", "Calendar Year Low",
+                          "Dividend Yield", "Dividend Amount", "Dividend Rate",
+                          "Pay Date", "Ex-dividend Date",
+                          "(Reserved)", "(Reserved)", "(Reserved)", "Short Interest", "(Reserved)",
+                          "Current Year EPS", "Next Year EPS",
+                          "Five-year Growth Percentage", "Fiscal Year End", "(Reserved)", "Company Name",
+                          "Root Option Symbol", "Percent Held By Institutions", "Beta", "Leaps",
+                          "Current Assets", "Current Liabilities", "Balance Sheet Date", "Long-term Debt",
+                          "Common Shares Outstanding", "(Reserved)", "Split Factor 1", "Split Factor 2",
+                          "(Reserved)", "Market Center", "Format Code", "Precision", "SIC",
+                          "Historical Volatility", "Security Type", "Listed Market",
+                          "52 Week High Date", "52 Week Low Date",
+                          "Calendar Year High Date", "Calendar Year Low Date",
+                          "Year End Close", "Maturity Date", "Coupon Rate", "Expiration Date",
+                          "Strike Price", "NAICS", "Exchange Root"]
+
+    fundamental_type = [('Symbol', 'S128'),
+                        ('PE', 'f8'),
+                        ('Average Volume', 'f8'),
+                        ('52 Week High', 'f8'), ('52 Week Low', 'f8'),
+                        ('Calendar Year High', 'f8'), ('Calendar Year Low', 'f8'),
+                        ('Dividend Yield', 'f8'), ('Dividend Amount', 'f8'), ('Dividend Rate', 'f8'),
+                        ('Pay Date', 'M8[D]'), ('Ex-dividend Date', 'M8[D]'),
+                        ('Short Interest', 'i8'),
+                        ('Current Year EPS', 'f8'), ('Next Year EPS', 'f8'),
+                        ('Five-year Growth Percentage', 'f8'), ('Fiscal Year End', 'u1'),
+                        ('Company Name', 'S256'),
+                        ('Root Option Symbol', 'S256'),
+                        ('Percent Held By Institutions', 'f8'),
+                        ('Beta', 'f8'), ('Leaps', 'S128'),
+                        ('Current Assets', 'f8'), ('Current Liabilities', 'f8'),
+                        ('Balance Sheet Date', 'M8[D]'), ('Long-term Debt', 'f8'),
+                        ('Common Shares Outstanding', 'f8'),
+                        ('Split Factor 1 Date', 'M8[D]'), ('Split Factor 1', 'f8'),
+                        ('Split Factor 2 Date', 'M8[D]'), ('Split Factor 2', 'f8'),
+                        ('Format Code', 'u1'), ('Precision', 'u1'),
+                        ('SIC', 'u8'),
+                        ('Historical Volatility', 'f8'),
+                        ('Security Type', 'u1'), ('Listed Market', 'u1'),
+                        ('52 Week High Date', 'M8[D]'), ('52 Week Low Date', 'M8[D]'),
+                        ('Calendar Year High Date', 'M8[D]'), ('Calendar Year Low Date', 'M8[D]'),
+                        ('Year End Close', 'f8'), ('Maturity Date', 'M8[D]'),
+                        ('Coupon Rate', 'f8'), ('Expiration Date', 'M8[D]'),
+                        ('Strike Price', 'f8'),
+                        ('NAICS', 'u8'),
+                        ('Exchange Root', 'S128')]
+
+    quote_msg_map = {'Symbol': ('Symbol', 'S128', lambda x: x),
+                     '7 Day Yield': ('7 Day Yield', 'f8', read_float64),
+                     'Ask': ('Ask', 'f8', read_float64),
+                     'Ask Change': ('Ask Change', 'f8', read_float64),
+                     'Ask Market Center': ('Ask Market Center', 'u1', read_uint8),
+                     'Ask Size': ('Ask Size', 'u8', read_uint64),
+                     'Ask Time': ('Ask Time', 'u8', read_hhmmssmil),
+                     'Available Regions': ('Available Regions', 'S128', lambda x: x),  # TODO: Parse
+                     'Average Maturity': ('Average Maturity', 'f8', read_float64),
+                     'Bid': ('Bid', 'f8', read_float64),
+                     'Bid Change': ('Bid Change', 'f8', read_float64),
+                     'Bid Market Center': ('Bid Market Center', 'u1', read_uint8),
+                     'Bid Size': ('Bid Size', 'u8', read_uint64),
+                     'Bid Time': ('Bid Time', 'u8', read_hhmmssmil),
+                     'Change': ('Change', 'f8', read_float64),
+                     'Change From Open': ('Change From Open', 'f8', read_float64),
+                     'Close': ('Close', 'f8', read_float64),
+                     'Close Range 1': ('Close Range 1', 'f8', read_float64),
+                     'Close Range 2': ('Close Range 2', 'f8', read_float64),
+                     'Days to Expiration': ('Days to Expiration', 'u2', read_uint16),
+                     'Decimal Precision': ('Decimal Precision', 'u1', read_uint8),
+                     'Delay': ('Delay', 'u1', read_uint8),
+                     'Exchange ID': ('Exchange ID', 'u1', read_hex),
+                     'Extended Trade': ('Extended Price',  'f8', read_float64),
+                     'Extended Trade Date': ('Extended Trade Date', 'M8[D]', read_mmddccyy),
+                     'Extended Trade Market Center': ('Extended Trade Market Center', 'u1', read_uint8),
+                     'Extended Trade Size': ('Extended Trade Size', 'u8', read_uint64),
+                     'Extended Trade Time': ('Extended Trade Time', 'u8', read_hhmmssmil),
+                     'Extended Trading Change': ('Extended Trading Change', 'f8', read_float64),
+                     'Extended Trading Difference': ('Extended Trading Difference', 'f8', read_float64),
+                     'Financial Status Indicator': ('Financial Status Indicator', 'S1', lambda x: x),  # TODO: Parse
+                     'Fraction Display Code': ('Fraction Display Code', 'u1', read_uint8),
+                     'High': ('High', 'f8', read_float64),
+                     'Last': ('Last', 'f8', read_float64),
+                     'Last Date': ('Last Date', 'M8[D]', read_mmddccyy),
+                     'Last Market Center': ('Last Market Center', 'u1', read_uint8),
+                     'Last Size': ('Last Size', 'u8', read_uint64),
+                     'Last Time': ('Last Time', 'u8', read_hhmmssmil),
+                     'Low': ('Low', 'f8', read_float64),
+                     'Market Capitalization': ('Market Capitalization', 'f8', read_float64),
+                     'Market Open': ('Market Open', 'b1', read_market_open),
+                     'Message Contents': ('Message Contents', 'S9', lambda x: x),  # TODO: Parse
+                     'Most Recent Trade': ('Most Recent Trade', 'f8', read_float64),
+                     'Most Recent Trade Conditions': ('Most Recent Trade Conditions', 'S16', lambda x: x),  # TODO: Parse
+                     'Most Recent Trade Date': ('Most Recent Trade Date', 'M8[D]', read_mmddccyy),
+                     'Most Recent Trade Market Center': ('Most Recent Trade Market Center', 'u1', read_uint8),
+                     'Most Recent Trade Size': ('Most Recent Trade Size', 'u8', read_uint64),
+                     'Most Recent Trade Time': ('Most Recent Trade Time', 'u8', read_hhmmssmil),
+                     'Net Asset Value': ('Net Asset Value', 'f8', read_float64),
+                     'Number of Trades Today': ('Number of Trades Today', 'u8', read_uint64),
+                     'Open': ('Open', 'f8', read_float64),
+                     'Open Interest': ('Open Interest', 'u8', read_uint64),
+                     'Open Range 1': ('Open Range 1', 'f8', read_float64),
+                     'Open Range 2': ('Open Range 2', 'f8', read_float64),
+                     'Percent Change': ('Percent Change', 'f8', read_float64),
+                     'Percent Off Average Volume': ('Percent Off Average Volume', 'f8', read_float64),
+                     'Previous Day Volume': ('Previous Day Volume', 'u8', read_uint64),
+                     'Price-Earnings Ratio': ('Price-Earnings Ratio', 'f8', read_float64),
+                     'Range': ('Range', 'f8', read_float64),
+                     'Restricted Code': ('Restricted Code', 'b1', read_short_restricted),
+                     'Settle': ('Settle', 'f8', read_float64),
+                     'Settlement Date': ('Settlement Date', 'M8[D]', read_mmddccyy),
+                     'Spread': ('Spread', 'f8', read_float64),
+                     'Tick': ('Tick', 'i8', read_tick_direction),
+                     'TickID': ('TickId', 'u8', read_uint64),
+                     'Total Volume': ('Total Volume', 'u8', read_uint64),
+                     'Volatility': ('Volatility', 'f8', read_float64),
+                     'VWAP': ('VWAP', 'f8', read_float64)}
 
     def __init__(self, name:str = "QuoteConn", host: str = FeedConn.host, port: int = port):
         super().__init__(name, host, port)
-        self._set_price_update_metadata()
+        self._current_update_fields = []
+        self._update_names = []
+        self._update_dtype = []
+        self._update_reader = []
         self._set_message_mappings()
+        self._current_update_fields = ["Symbol",
+                                       "Most Recent Trade", "Most Recent Trade Size", "Most Recent Trade Time",
+                                       "Most Recent Trade Market Center", "Total Volume",
+                                       "Bid", "Bid Size", "Ask", "Ask Size",
+                                       "Open", "High", "Low", "Close",
+                                       "Message Contents", "Most Recent Trade Conditions"]
+        self._num_update_fields = len(self._current_update_fields)
+        self._set_current_update_structs(self._current_update_fields)
+        self.request_fundamental_fieldnames()
+        self.request_all_update_fieldnames()
+        self.request_current_update_fieldnames()
 
     def _set_message_mappings(self) -> None:
         super()._set_message_mappings()
@@ -364,64 +563,10 @@ class QuoteConn(FeedConn):
         self._sm_dict["UPDATE FIELDNAMES"] = self.process_update_fieldnames
         self._sm_dict["CURRENT UPDATE FIELDNAMES"] = self.process_current_update_fieldnames
 
-        self._update_fields = []
-        self._current_update_fields = []
-        self._fundamental_fields = []
-        self._update_names = []
-        self._update_dtype = []
-        self._set_price_update_metadata()
-
-    def _set_price_update_metadata(self):
-        self._fundamental_fields = ["F", "Symbol", "Exchange ID", "PE", "Average Volume", "52 Week High", "52 Week Low",
-                                    "Calendar year high", "Calendar year low",
-                                    "Dividend yield", "Dividend amount", "Dividend rate", "Pay date", "Ex-dividend date",
-                                    "(Reserved)", "(Reserved)", "(Reserved)", "Short Interest", "(Reserved)",
-                                    "Current year earnings per share", "Next year earnings per share",
-                                    "Five-year growth percentage", "Fiscal year end", "(Reserved)", "Company name",
-                                    "Root Option symbol", "Percent held by institutions", "Beta", "Leaps",
-                                    "Current assets", "Current liabilities", "Balance sheet date", "Long-term debt",
-                                    "Common shares outstanding", "(Reserved)", "Split factor 1", "Split factor 2",
-                                    "(Reserved)", "(Reserved)", "Format Code", "Precision", "SIC",
-                                    "Historical Volatility", "Security Type", "Listed Market",
-                                    "52 Week High Date", "52 Week Low Date",
-                                    "Calendar Year High Date", "Calencar Year Low Date",
-                                    "Year End Close", "Maturity Date", "Coupon Rate", "Expiration Date",
-                                    "Strike Price", "NAICS", "Exchange Root"]
-
-        self._update_fields = ["7 Day Yield",
-                               "Ask", "Ask Change", "Ask Market Center", "Ask Size", "Ask Time",
-                               "Available Regions", "Average Maturity",
-                               "Bid", "Bid Change", "Bid Market Center", "Bid Size", "Bid Time",
-                               "Chnage", "Change From Open", "Close", "Close Range 1", "Close Range 2",
-                               "Days to Expiration", "Decimal Precision", "Delay", "Exchange ID",
-                               "Extended Trade", "Extended Trade Date", "Extended Trade Market Center",
-                               "Extended Trade Size", "Extended Trade Time", "Extended Trading Change",
-                               "Extended Trading Difference",
-                               "Financial Status Indicator",
-                               "Fraction Display Code",
-                               "High",
-                               "Last", "Last Date", "Last Market Center", "Last Size", "Last Time", "Last Trade Date",
-                               "Low",
-                               "Market Capitalization",
-                               "Market Open", "Message Contents",
-                               "Most Recent Trade", "Most Recent Trade Conditions", "Most Recent Trade Date",
-                               "Most Recent Trade Market Center", "Most Recent Trade Size", "Most Recent Trade Time",
-                               "Net Asset Value", "Number of Trades Today", "Open", "Open Range 1", "Open Range 2",
-                               "Percent Change", "Percent Off Average Volume", "Previous Day Volume",
-                               "Price-Earnings Ratio", "Range", "Restricted Code", "Settle", "Settlement Date", "Spread",
-                               "Symbol", "Tick", "TickID", "Total Volume", "Type", "Volatility", "VWAP"]
-
-        self._current_update_fields = ["Type", "Symbol", "Most Recent Trade", "Most Recent Trade Size",
-                                       "Most Recent Trade Time", "Most Recent Trade Market Center","Total Volume",
-                                       "Bid", "Bid Size", "Ask", "Ask Size", "Open", "High", "Low", "Close",
-                                       "Message Contents", "Most Recent Trade Conditions"]
-
-
     def process_invalid_symbol(self, fields: Sequence[str]) -> None:
         assert len(fields) > 1
         assert fields[0] == 'n'
         bad_sym = fields[1]
-        print("process_invalid_symbol: %s" % bad_sym)
         for listener in self._listeners:
             listener.process_bad_symbol_error(bad_sym)
 
@@ -444,144 +589,111 @@ class QuoteConn(FeedConn):
     def process_regional_quote(self, fields: Sequence[str]):
         assert len(fields) > 11
         assert fields[0] == "R"
-        quote = np.empty(shape=(1), dtype=QuoteConn.rgnl_dtype)
-        quote["ticker"] = fields[1]
-        quote["rgn_bid"] = float(fields[3])
-        quote["rgn_bid_sz"] = int(fields[4])
-        quote["rgn_bid_tm"] = hh_mm_ss_to_secs_since_midnight(fields[5])
-        quote["rgn_ask"] = float(fields[6])
-        quote["rgn_ask_sz"] = int(fields[7])
-        quote["rgn_ask_tm"] = hh_mm_ss_to_secs_since_midnight(fields[8])
-        quote["mkt_center"] = int(fields[9])
-        quote["display_type"] = int(fields[10])
-        quote["precision"] = int(fields[11])
+        rgn_quote = np.empty(shape=(1), dtype=QuoteConn.regional_type)
+        rgn_quote["Symbol"] = fields[1]
+        rgn_quote["Regional Bid"] = read_float64(fields[3])
+        rgn_quote["Regional BidSize"] = read_uint64(fields[4])
+        rgn_quote["Regional BidTime"] = read_hhmmss(fields[5])
+        rgn_quote["Regional Ask"] = read_float64(fields[6])
+        rgn_quote["Regional AskSize"] = read_uint64(fields[7])
+        rgn_quote["Regional AskTime"] = read_hhmmss(fields[8])
+        rgn_quote["Fraction Display Code"] = read_uint8(fields[9])
+        rgn_quote["Decimal Precision"] = read_uint8(fields[10])
+        rgn_quote["Market Center"] = read_uint8(fields[11])
         for listener in self._listeners:
-            listener.process_regional_quote(quote)
+            listener.process_regional_rgn_quote(rgn_quote)
 
     def process_summary(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == "P"
-        print("Default process_summary: %s" % ",".join(fields))
-        update_dict = self.create_update_dict(fields[1:])
+        update = self.create_update(fields)
         for listener in self._listeners:
-            listener.process_summary(update_dict)
+            listener.process_update(update)
 
     def process_update(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == "Q"
-        print("Default process_update: %s" % ",".join(fields))
-        update_dict = self.create_update_dict(fields[1:])
+        update = self.create_update(fields)
         for listener in self._listeners:
-            listener.process_update(update_dict)
+            listener.process_update(update)
 
-    def create_update_dict(self, fields: Sequence[str]) -> dict:
-        update_dict = {}
-        if len(self._current_update_fields) > 0:
-            for i in range(len(fields)):
-                update_dict[self._current_update_fields[i]] = fields[i]
-        return update_dict
+    def create_update(self, fields: Sequence[str]) -> np.array:
+        update = np.empty(1, self._update_dtype)
+        for field_num, field in enumerate(fields[1:]):
+            if field_num >= self._num_update_fields and field == "":
+                break
+            update[self._update_names[field_num]] = self._update_reader[field_num](field)
+        print("Quote Update:")
+        print(update)
+        print(update.dtype)
+        return update
 
     def process_fundamentals(self, fields: Sequence[str]):
         assert len(fields) > 55
         assert fields[0] == 'F'
-        print("process_fundamentals: %s" % ",".join(fields))
+        msg = np.zeros(1, dtype=QuoteConn.fundamental_type)
 
-        symbol = fields[1]
-        pe = read_float(fields[3])
-        avg_vlm = read_int(fields[4])
-        hi_52wk = read_float(fields[5])
-        lo_52wk = read_float(fields[6])
-        hi_cal_yr = read_float(fields[7])
-        lo_cal_yr = read_float(fields[8])
-
-        div_yld = read_float(fields[9])
-        div_amt = read_float(fields[10])
-        div_rate = read_float(fields[11])
-        pay_dt = read_mm_dd_yyyy(fields[12])
-        ex_div_dt = read_mm_dd_yyyy(fields[13])
-
-        short_int = read_int(fields[17])
-
-        eps_cur_yr = read_float(fields[19])
-        eps_next_yr = read_float(fields[20])
-        growth_5_yr = read_float(fields[21])
-        yr_end = read_int(fields[22])
-
-        name = fields[24]
-        root_opt_syms = fields[25].split(" ")
-        inst_hld_pcnt = read_float(fields[26])
-        beta = read_float(fields[27])
-        leaps = fields[28].split(" ")
-
-        current_assets = read_float(fields[29])
-        current_liabs = read_float(fields[30])
-        balance_sheet_dt = read_mm_dd_yyyy(fields[31])
-        long_term_debt = read_float(fields[32])
-        shares_outstanding = read_float(fields[33])
-
-        (split_factor_1, split_date_1) = read_split_string(fields[35])
-        (split_factor_2, split_date_2) = read_split_string(fields[36])
-
-        display_format = read_int(fields[39])
-        precision = read_int(fields[40])
-
-        sic = read_int(fields[41])
-        hist_vol = read_float(fields[42])
-        sec_type = read_int(fields[43])
-        listed_mkt =  read_int(fields[44])
-        hi_dt_52wk = read_mm_dd_yyyy(fields[45])
-        lo_dt_52wk = read_mm_dd_yyyy(fields[46])
-        hi_dt_cal_yr = read_mm_dd_yyyy(fields[47])
-        lo_dt_cal_yr = read_mm_dd_yyyy(fields[48])
-        yr_end_close = read_float(fields[49])
-        mat_dt = read_mm_dd_yyyy(fields[50])
-        coupon_rate = read_float(fields[51])
-        exp_dt = read_mm_dd_yyyy(fields[52])
-        strike_price = read_float(fields[53])
-        naics = read_int(fields[54])
-        root_sym = fields[55]
-
-        fund_msg = {"symbol": symbol, "name": name, "root_symbol": root_sym,
-                    "root_opt_syms": root_opt_syms, "leaps": leaps,
-                    "sec_type": sec_type, "listed_mkt": listed_mkt, "exchange_root": exchange_root,
-                    "strike_price": strike_price, "exp_dt": exp_dt,
-                    "coupon_rate": coupon_rate, "mat_dt": mat_dt,
-
-                    "avg_vlm": avg_vlm,
-                    "hi_52_wk": hi_52wk, "hi_dt_52_wk": hi_dt_52wk,
-                    "lo_52_wk": lo_52wk, "lo_dt_52_wk": lo_dt_52wk,
-                    "hi_cal_yr": hi_cal_yr, "hi_dt_cal_yr": hi_dt_cal_yr,
-                    "lo_cal_yr": lo_cal_yr, "lo_dt_cal_yr": lo_dt_cal_yr,
-                    "yr_end_close": yr_end_close,
-
-                    "beta": beta, "hist_vol": hist_vol,
-                    "short_int": short_int, "shares_outstanding": shares_outstanding, "inst_held_pcnt": inst_hld_pcnt,
-
-                    "pe": pe, "eps_cur_yr": eps_cur_yr, "eps_next_yr": eps_next_yr, "growth_5_yr": growth_5_yr,
-                    "year_end_month": yr_end,
-
-                    "div_yld": div_yld, "div_amt": div_amt, "div_rate": div_rate, "pay_dt": pay_dt, "ex_div_dt": ex_div_dt,
-
-                    "current_assets": current_assets, "current_liabs": current_liabs,
-                    "balance_sheet_dt": balance_sheet_dt,
-                    "long_term_debt": long_term_debt,
-
-                    "split_factor_1": split_factor_1, "split_date_1": split_date_1,
-                    "split_factor_2": split_factor_2, "split_date_2": split_date_2,
-
-                    "display_format": display_format, "precision": precision,
-
-                    "sic": sic, "naics": naics}
-
+        msg['Symbol'] = fields[1]
+        msg['PE'] = read_float64(fields[3])
+        msg['Average Volume'] = read_uint64(fields[4])
+        msg['52 Week High'] = read_float64(fields[5])
+        msg['52 Week Low'] = read_float64(fields[6])
+        msg['Calendar Year High'] = read_float64(fields[7])
+        msg['Calendar Year Low'] = read_float64(fields[8])
+        msg['Dividend Yield'] = read_float64(fields[9])
+        msg['Dividend Amount'] = read_float64(fields[10])
+        msg['Dividend Rate'] = read_float64(fields[11])
+        msg['Pay Date'] = read_mmddccyy(fields[12])
+        msg['Ex-dividend Date'] = read_mmddccyy(fields[13])
+        msg['Short Interest'] = read_uint64(fields[17])
+        msg['Current Year EPS'] = read_float64(fields[19])
+        msg['Next Year EPS'] = read_float64(fields[20])
+        msg['Five-year Growth Percentage'] = read_float64(fields[21])
+        msg['Fiscal Year End'] = read_uint8(fields[22])
+        msg['Company Name'] = fields[24]
+        msg['Root Option Symbol'] = fields[25]    # TODO:Parse
+        msg['Percent Held By Institutions'] = read_float64(fields[26])
+        msg['Beta'] = read_float64(fields[27])
+        msg['Leaps'] = fields[28] # TODO: Parse
+        msg['Current Assets'] = read_float64(fields[29])
+        msg['Current Liabilities'] = read_float64(fields[30])
+        msg['Balance Sheet Date'] = read_mmddccyy(fields[31])
+        msg['Long-term Debt'] = read_float64(fields[32])
+        msg['Common Shares Outstanding'] = read_float64(fields[33])
+        (fact, dt) = read_split_string(fields[35])
+        msg['Split Factor 1 Date'] = dt
+        msg['Split Factor 1'] = fact
+        (fact, dt) = read_split_string(fields[36])
+        msg['Split Factor 2 Date'] = dt
+        msg['Split Factor 2'] = fact
+        msg['Format Code'] = read_uint8(fields[39])
+        msg['Precision'] = read_uint8(fields[40])
+        msg['SIC'] = read_uint64(fields[41])
+        msg['Historical Volatility'] = read_float64(fields[42])
+        msg['Security Type'] = read_int(fields[43])
+        msg['Listed Market'] =  read_uint8(fields[44])
+        msg['52 Week High Date'] = read_mmddccyy(fields[45])
+        msg['52 Week Low Date'] = read_mmddccyy(fields[46])
+        msg['Calendar Year High Date'] = read_mmddccyy(fields[47])
+        msg['Calendar Year Low Date'] = read_mmddccyy(fields[48])
+        msg['Year End Close'] = read_float64(fields[49])
+        msg['Maturity Date'] = read_mmddccyy(fields[50])
+        msg['Coupon Rate'] = read_float64(fields[51])
+        msg['Expiration Date'] = read_mmddccyy(fields[52])
+        msg['Strike Price'] = read_float64(fields[53])
+        msg['NAICS'] = read_uint8(fields[54])
+        msg['Exchange Root'] = fields[55]
+        print("Fundamental Message:")
+        print(msg)
+        print(msg.dtype)
         for listener in self._listeners:
-            listener.process_fundamentals(fund_msg)
+            listener.process_fundamentals(msg)
 
     def process_auth_key(self, fields: Sequence[str]) -> None:
-        assert len(fields) > 2:
+        assert len(fields) > 2
         assert fields[0] == "S"
-        assert fields[1] = "KEY"
+        assert fields[1] == "KEY"
         auth_key = fields[2]
-        print("process_auth_key: %s" % auth_key)
         for listener in self._listeners:
             listener.process_auth_key(auth_key)
 
@@ -589,15 +701,13 @@ class QuoteConn(FeedConn):
         assert len(fields) > 1
         assert fields[0] == 'S'
         assert fields[1] == "KEYOK"
-        print("process_keyok")
         for listener in self._listeners:
             listener.process_keyok()
 
     def process_customer_info(self, fields: Sequence[str]) -> None:
-        assert len(fields) > 11:
+        assert len(fields) > 11
         assert fields[0] == 'S'
         assert fields[1] == "CUST"
-        print("process_customer_info: %s" % ",".join(fields))
         msg_dict = {"svc_t": (fields[2] == "real_time"),
                     "ip_add": fields[3], "port": int(fields[4]),
                     "token": fields[5], "version": fields[6],
@@ -612,7 +722,6 @@ class QuoteConn(FeedConn):
         assert fields[0] == 'S'
         assert fields[1] == "SYMBOL LIMIT REACHED"
         sym = fields[2]
-        print("process_symbol_limit_reached: %s" % sym)
         for listener in self._listeners:
             listener.process_symbol_limit_reached(sym)
 
@@ -621,7 +730,6 @@ class QuoteConn(FeedConn):
         assert fields[0] == 'S'
         assert fields[1] == 'IP'
         ip = fields[2]
-        print("process_ip_addresses_used: %s" % ip)
         for listener in self._listeners:
             listener.process_ip_addresses_used(ip)
 
@@ -629,65 +737,50 @@ class QuoteConn(FeedConn):
         assert len(fields) > 2
         assert fields[0] == 'S'
         assert fields[1] == 'FUNDAMENTAL FIELDNAMES'
-
-        # Remove this after debugging
         for field in fields[2:]:
-            if field not in self._fundamental_fields:
-                print("%s not found in self._fundamental_fieldnames" % field)
-        for field in self._fundamental_fields:
+            if field not in QuoteConn.fundamental_fields:
+                raise RuntimeError("Protocol Conflict: %s not found in QuoteConn.dtn_fundamental_fields" % field)
+        for field in QuoteConn.fundamental_fields:
             if field not in fields[2:]:
-                print("%s not found in FUNDAMENTAL FIELDNAMES message" % field)
-        # Remove this after debugging
-
-        self._fundamental_fields = fields[2:]
-        print("process_fundamental_fieldnames: %s" % ",".join(self._fundamental_fields))
-        for listener in self._listeners:
-            listener.process_fundamental_fieldnames(self._fundamental_fields)
+                raise RuntimeError("%s not found in FUNDAMENTAL FIELDNAMES message" % field)
 
     def process_update_fieldnames(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == 'S'
         assert fields[1] == 'UPDATE FIELDNAMES'
-
-        # Remove this after debugging
+        # Raise exception instead of printing after debugging
         for field in fields[2:]:
-            if field not in self._update_fields:
-                print("%s not found in self._update_fieldnames" % field)
-        for field in self._update_fields:
+            if field not in QuoteConn.quote_msg_map:
+                raise RuntimeError("Protocol Conflict: %s not found in QuoteConn.dtn_update_map" % field)
+        for field in QuoteConn.quote_msg_map:
             if field not in fields[2:]:
-                print("%s not found in UPDATE FIELDNAMES message" % field)
-        # Remove this after debugging
-
-        self._update_fields = fields[2:]
-        print("process_update_fieldnames: %s" % ",".join(self._update_fields))
-        for listener in self._listeners:
-            listener.process_update_fieldnames(self._update_fields)
+                raise RuntimeError("Protocol Conflict: %s not found in UPDATE FIELDNAMES message" % field)
 
     def process_current_update_fieldnames(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == 'S'
         assert fields[1] == 'CURRENT UPDATE FIELDNAMES'
-        for field in fields[2:]:
-            if field not in self._update_fields:
-                raise RuntimeError("Got an %s as an update field. Field not in self._update_fieldnames" % field)
+        self._set_current_update_structs(fields[2:])
 
-        # Update dtype string, field reading functions etc here.
-        self._current_update_fields = fields[2:]
-        print("process_current_update_fieldnames: %s" % ",".join(self._current_update_fields))
-        for listener in self._listeners:
-            listener.process_current_update_fieldnames(self._current_update_fields)
-
-    def watch(self, symbol: str) -> None:
-        self.send_cmd("w%s\r\n" % symbol)
-
-    def trades_watch(self, symbol: str) -> None:
-        self.send_cmd("t%s\r\n" % symbol)
-
-    def unwatch(self, symbol: str) -> None:
-        self.send_cmd("r%s\r\n" % symbol)
-
-    def refresh(self, symbol: str) -> None:
-        self.send_cmd("f%s\r\n" % symbol)
+    def _set_current_update_structs(self, fields):
+        num_update_fields = len(fields)
+        new_update_fields = list(itertools.repeat("", num_update_fields))
+        new_update_names = new_update_fields
+        new_update_dtypes = list(itertools.repeat(("no_name", 'i8'), num_update_fields))
+        new_update_reader = list(itertools.repeat(lambda x: x, num_update_fields))
+        for field_num, field in enumerate(fields):
+            if field not in QuoteConn.quote_msg_map:
+                raise RuntimeError("Protocol Conflict: %s not in QuoteConn.dtn_update_map" % field)
+            new_update_fields[field_num] = field
+            dtn_update_tup = QuoteConn.quote_msg_map[field]
+            new_update_names[field_num] = dtn_update_tup[0]
+            new_update_dtypes[field_num] = (dtn_update_tup[0], dtn_update_tup[1])
+            new_update_reader[field_num] = dtn_update_tup[2]
+        self._current_update_fields = new_update_fields
+        self._update_names = new_update_names
+        self._update_dtype = new_update_dtypes
+        self._update_reader = new_update_reader
+        self._num_update_fields = len(new_update_fields)
 
     def req_timestamp(self) -> None:
         self.send_cmd("T\r\n")
@@ -698,11 +791,29 @@ class QuoteConn(FeedConn):
     def timestamp_off(self) -> None:
         self.send_cmd("S,TIMESTAMPSOFF\r\n")
 
-    def regional_on(self, symbol: str) -> None:
+    def trades_watch(self, symbol: str) -> None:
+        self.send_cmd("t%s\r\n" % symbol)
+
+    def watch(self, symbol: str) -> None:
+        self.send_cmd("w%s\r\n" % symbol)
+
+    def unwatch(self, symbol: str) -> None:
+        self.send_cmd("r%s\r\n" % symbol)
+
+    def watch_regional(self, symbol: str) -> None:
         self.send_cmd("S,REGON,%s\r\n" % symbol)
 
-    def regional_off(self, symbol: str) -> None:
+    def unwatch_regional(self, symbol: str) -> None:
         self.send_cmd("S,REGOFF,%s\r\n" % symbol)
+
+    def refresh(self, symbol: str) -> None:
+        self.send_cmd("f%s\r\n" % symbol)
+
+    def request_watches(self) -> None:
+        self.send_cmd("S,REQUEST WATCHES\r\n")
+
+    def unwatch_all(self) -> None:
+        self.send_cmd("S,UNWATCH ALL")
 
     def news_on(self) -> None:
         self.send_cmd("S,NEWSON\r\n")
@@ -723,23 +834,24 @@ class QuoteConn(FeedConn):
         self.send_cmd("S,REQUEST CURRENT UPDATE FIELDNAMES\r\n")
 
     def select_update_fieldnames(self, field_names: Sequence[str]) -> None:
+        symbol_field = "Symbol"
+        if symbol_field not in field_names:
+            field_names.insert(0, symbol_field)
+        else:
+            symbol_idx = field_names.index("Symbol")
+            if symbol_idx != 0:
+                field_names[0], field_names[symbol_idx] = field_names[symbol_idx] , field_names[0]
         self.send_cmd("S,SELECT UPDATE FIELDS,%s\r\n" % ",".join(field_names))
 
     def set_log_levels(self, log_levels: Sequence[str]) -> None:
         self.send_cmd("S,SET LOG LEVELS,%s\r\n" % ",".join(log_levels))
 
-    def request_watches(self) -> None:
-        self.send_cmd("S,REQUEST WATCHES\r\n")
-
-    def unwatch_all(self) -> None:
-        self.send_cmd("S,UNWATCH ALL")
-
-
 if __name__ == "__main__":
     from service import FeedService
     from passwords import dtn_login, dtn_password, dtn_product_id
 
-    svc = FeedService(product=dtn_product_id, version="Debugging", login=dtn_login, password=dtn_password)
+    svc = FeedService(product=dtn_product_id, version="Debugging", login=dtn_login, password=dtn_password,
+                      autoconnect=True, savelogininfo=True)
     svc.launch()
 
     conn = QuoteConn(name="RunningInIDE")
@@ -748,9 +860,10 @@ if __name__ == "__main__":
     conn.request_all_update_fieldnames()
     conn.request_current_update_fieldnames()
     conn.request_fundamental_fieldnames()
-
+    all_fields = sorted(list(QuoteConn.quote_msg_map.keys()))
+    conn.select_update_fieldnames(all_fields)
+    conn.watch_regional("@VXH16")
+    time.sleep(30)
     conn.stop_runner()
-
-    
 
 
