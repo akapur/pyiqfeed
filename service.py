@@ -21,7 +21,9 @@ class FeedService:
         if self.savelogininfo:
             iqfeed_args = "%s -savelogininfo" % iqfeed_args
         if os.name == 'nt':
+            # noinspection PyUnresolvedReferences
             import win32api
+            # noinspection PyUnresolvedReferences
             import win32con
             win32api.ShellExecute(0, "open", "IQConnect.exe", iqfeed_args, "", win32con.SW_SHOWNORMAL)
         elif os.name == 'posix':
@@ -40,5 +42,10 @@ class FeedService:
 
 if __name__ == "__main__":
     from passwords import dtn_product_id, dtn_login, dtn_password
-    feed = FeedService(product = dtn_product_id, version="TestingInIDE", login=dtn_login, password=dtn_password, autoconnect=True, savelogininfo=True)
+    feed = FeedService(product=dtn_product_id,
+                       version="TestingInIDE",
+                       login=dtn_login,
+                       password=dtn_password,
+                       autoconnect=True,
+                       savelogininfo=True)
     feed.launch()

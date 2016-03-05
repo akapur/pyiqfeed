@@ -75,24 +75,6 @@ def read_float64(field: str) -> np.float64:
     return np.float64(field) if field != "" else np.nan
 
 
-# def read_hhmmss(hhmmss: str) -> datetime.time:
-#     if hhmmss != "":
-#         tm = time.strptime(hhmmss, "%H:%M:%S")
-#         return datetime.time(tm.tm_hour, tm.tm_min, tm.tm_sec)
-#     else:
-#         return None
-#
-#
-# def read_mm_dd_yyyy(date_str: str) -> datetime.date:
-#     if date_str != "":
-#         timestamp = time.strptime(date_str, "%m/%d/%Y")
-#         return datetime.date.fromtimestamp(timestamp)
-#     else:
-#         return None
-#
-#
-
-
 def read_split_string(split_str: str) -> tuple:
     split_fld_0, split_fld_1 = ("", "")
     if split_str != "":
@@ -126,6 +108,7 @@ def read_hhmmssmil(field: str) -> int:
         return 0
 
 
+# noinspection PyUnresolvedReferences
 def read_mmddccyy(field: str) -> np.datetime64:
     if field != "":
         month = int(field[0:2])
@@ -136,6 +119,7 @@ def read_mmddccyy(field: str) -> np.datetime64:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
 
 
+# noinspection PyUnresolvedReferences
 def read_yyyymmdd_hhmmss(dt_tm: str) -> Tuple[datetime.date, int]:
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
@@ -148,29 +132,31 @@ def read_yyyymmdd_hhmmss(dt_tm: str) -> Tuple[datetime.date, int]:
         minute = read_int(time_str[2:4])
         second = read_int(time_str[4:6])
         msecs_since_midnight = 1000000 * ((3600*hour) + (60*minute) + second)
-        return (dt, msecs_since_midnight)
+        return dt, msecs_since_midnight
     else:
-        return (np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0)
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
+# noinspection PyUnresolvedReferences
 def read_posix_ts_mil(dt_tm_str: str) -> Tuple[np.datetime64, int]:
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
         dt = np.datetime64(date_str, 'D')
         tm = read_hhmmssmil(time_str)
-        return (dt, tm)
+        return dt, tm
     else:
-        return (np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0)
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
+# noinspection PyUnresolvedReferences
 def read_posix_ts(dt_tm_str: str) -> Tuple[np.datetime64, int]:
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
         dt = np.datetime64(date_str, 'D')
         tm = read_hhmmss(time_str)
-        return (dt, tm)
+        return dt, tm
     else:
-        return (np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0)
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
 def str_or_blank(val) -> str:
@@ -180,7 +166,7 @@ def str_or_blank(val) -> str:
         return ""
 
 
-def ms_since_midnight_to_time(ms: np.uint64) -> datetime.time:
+def ms_since_midnight_to_time(ms: int) -> datetime.time:
     assert ms >= 0
     assert ms <= 86400000000
     secs_since_midnight = np.floor(ms/1000000.0)
@@ -197,6 +183,7 @@ def time_to_hhmmss(tm: datetime.time) -> str:
         return ""
 
 
+# noinspection PyUnresolvedReferences
 def datetime64_to_date(dt64: np.datetime64) -> datetime.date:
     return dt64.astype(datetime.date)
 
@@ -208,7 +195,8 @@ def date_to_yyyymmdd(dt: datetime.date) -> str:
         return ""
 
 
-def date_ms_to_datetime(dt64: np.datetime64, tm_int: np.uint64) -> datetime.datetime:
+# noinspection PyUnresolvedReferences
+def date_ms_to_datetime(dt64: np.datetime64, tm_int: int) -> datetime.datetime:
     dt = datetime64_to_date(dt64)
     tm = ms_since_midnight_to_time(tm_int)
     return datetime.datetime(year=dt.year, month=dt.month, day=dt.day, hour=tm.hour, minute=tm.minute, second=tm.second)
@@ -216,6 +204,7 @@ def date_ms_to_datetime(dt64: np.datetime64, tm_int: np.uint64) -> datetime.date
 
 def datetime_to_yyyymmdd_hhmmss(dt_tm: datetime.datetime) -> str:
     if dt_tm is not None:
+        # noinspection PyPep8
         return "%.4d%.2d%.2d %.2d%.2d%.2d" % (dt_tm.year, dt_tm.month, dt_tm.day, dt_tm.hour, dt_tm.minute, dt_tm.second)
     else:
         return ""
@@ -257,7 +246,6 @@ class FeedConn:
 
     def send_cmd(self, cmd: str) -> None:
         with self._send_lock:
-            print("Sending Command: %s" % cmd)
             self._sock.sendall(cmd.encode(encoding='utf-8', errors='strict'))
 
     def connect(self, host, port) -> None:
@@ -319,7 +307,6 @@ class FeedConn:
         if ready_list[0]:
             with self._buf_lock:
                 data_recvd = self._sock.recv(16384).decode()
-                print(data_recvd)
                 self._recv_buf += data_recvd
                 return True
         return False
@@ -350,6 +337,7 @@ class FeedConn:
         else:
             return self.process_unregistered_message
 
+    # noinspection PyMethodMayBeStatic
     def process_unregistered_message(self, fields: Sequence[str]) -> None:
         raise RuntimeError("Unexpected message received: %s", ",".join(fields))
 
@@ -368,9 +356,11 @@ class FeedConn:
         else:
             return self.process_unregistered_system_message
 
+    # noinspection PyMethodMayBeStatic
     def process_unregistered_system_message(self, fields: Sequence[str]) -> None:
         raise RuntimeError("Unexpected system message received: %s", ",".join(fields))
 
+    # noinspection PyMethodMayBeStatic
     def process_current_protocol(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == "S"
@@ -522,6 +512,7 @@ class QuoteConn(FeedConn):
                         ('NAICS', 'u8'),
                         ('Exchange Root', 'S128')]
 
+    # noinspection PyPep8
     quote_msg_map = {'Symbol': ('Symbol', 'S128', lambda x: x),
                      '7 Day Yield': ('7 Day Yield', 'f8', read_float64),
                      'Ask': ('Ask', 'f8', read_float64),
@@ -591,7 +582,7 @@ class QuoteConn(FeedConn):
                      'Volatility': ('Volatility', 'f8', read_float64),
                      'VWAP': ('VWAP', 'f8', read_float64)}
 
-    def __init__(self, name:str = "QuoteConn", host: str = FeedConn.host, port: int = port):
+    def __init__(self, name: str = "QuoteConn", host: str = FeedConn.host, port: int = port):
         super().__init__(name, host, port)
         self._current_update_fields = []
         self._update_names = []
@@ -654,7 +645,7 @@ class QuoteConn(FeedConn):
     def process_regional_quote(self, fields: Sequence[str]):
         assert len(fields) > 11
         assert fields[0] == "R"
-        rgn_quote = np.empty(shape=(1), dtype=QuoteConn.regional_type)
+        rgn_quote = np.empty(shape=1, dtype=QuoteConn.regional_type)
         rgn_quote["Symbol"] = fields[1]
         rgn_quote["Regional Bid"] = read_float64(fields[3])
         rgn_quote["Regional BidSize"] = read_uint64(fields[4])
@@ -716,7 +707,7 @@ class QuoteConn(FeedConn):
         msg['Root Option Symbol'] = fields[25]    # TODO:Parse
         msg['Percent Held By Institutions'] = read_float64(fields[26])
         msg['Beta'] = read_float64(fields[27])
-        msg['Leaps'] = fields[28] # TODO: Parse
+        msg['Leaps'] = fields[28]  # TODO: Parse
         msg['Current Assets'] = read_float64(fields[29])
         msg['Current Liabilities'] = read_float64(fields[30])
         msg['Balance Sheet Date'] = read_mmddccyy(fields[31])
@@ -733,7 +724,7 @@ class QuoteConn(FeedConn):
         msg['SIC'] = read_uint64(fields[41])
         msg['Historical Volatility'] = read_float64(fields[42])
         msg['Security Type'] = read_int(fields[43])
-        msg['Listed Market'] =  read_uint8(fields[44])
+        msg['Listed Market'] = read_uint8(fields[44])
         msg['52 Week High Date'] = read_mmddccyy(fields[45])
         msg['52 Week Low Date'] = read_mmddccyy(fields[46])
         msg['Calendar Year High Date'] = read_mmddccyy(fields[47])
@@ -792,6 +783,7 @@ class QuoteConn(FeedConn):
         for listener in self._listeners:
             listener.process_ip_addresses_used(ip)
 
+    # noinspection PyMethodMayBeStatic
     def process_fundamental_fieldnames(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == 'S'
@@ -803,6 +795,7 @@ class QuoteConn(FeedConn):
             if field not in fields[2:]:
                 raise RuntimeError("%s not found in FUNDAMENTAL FIELDNAMES message" % field)
 
+    # noinspection PyMethodMayBeStatic
     def process_update_fieldnames(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == 'S'
@@ -899,7 +892,7 @@ class QuoteConn(FeedConn):
         else:
             symbol_idx = field_names.index("Symbol")
             if symbol_idx != 0:
-                field_names[0], field_names[symbol_idx] = field_names[symbol_idx] , field_names[0]
+                field_names[0], field_names[symbol_idx] = field_names[symbol_idx], field_names[0]
         self.send_cmd("S,SELECT UPDATE FIELDS,%s\r\n" % ",".join(field_names))
 
     def set_log_levels(self, log_levels: Sequence[str]) -> None:
@@ -910,7 +903,7 @@ class AdminConn(FeedConn):
     port = 9300
     host = "127.0.0.1"
 
-    def __init__(self, name:str ="AdminConn", host: str = host, port: int = port):
+    def __init__(self, name: str ="AdminConn", host: str = host, port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
 
@@ -1018,7 +1011,6 @@ class AdminConn(FeedConn):
             client_stats_dict["num_reg_subs"] = num_reg_sym
         elif 2 == type_int:
             client_stats_dict["num_depth_subs"] = num_sym
-        print(client_stats_dict)
         for listener in self._listeners:
             listener.process_client_stats(client_stats_dict)
 
@@ -1135,7 +1127,7 @@ class HistoryConn(FeedConn):
 
     def _get_next_req_id(self) -> str:
         with self._buf_lock:
-            req_id = "H_%.10d" % (self._req_num)
+            req_id = "H_%.10d" % self._req_num
             self._req_num += 1
             return req_id
 
@@ -1157,10 +1149,10 @@ class HistoryConn(FeedConn):
     def get_data_buf(self, req_id: str) -> namedtuple:
         with self._buf_lock:
             buf = HistoryConn._databuf(
-                failed = self._req_failed[req_id],
-                err_msg = self._req_err[req_id],
-                num_pts = self._req_numlines[req_id],
-                raw_data = self._req_buf[req_id]
+                failed=self._req_failed[req_id],
+                err_msg=self._req_err[req_id],
+                num_pts=self._req_numlines[req_id],
+                raw_data=self._req_buf[req_id]
             )
         self._cleanup_request_data(req_id)
         return buf
@@ -1173,19 +1165,20 @@ class HistoryConn(FeedConn):
             data = np.empty(res.num_pts, HistoryConn.tick_type)
             line_num = 0
             while res.raw_data and (line_num < res.num_pts):
-                [req_id, tick_time, last, last_sz, tot_vlm,
-                 bid, ask, tick_id, last_type, mkt_center, cond_str, empty] = res.raw_data.popleft()
-                data[line_num]['tick_id'] = np.uint64(tick_id)
-                (dt, tm) = read_posix_ts_mil(tick_time)
+                dl = res.raw_data.popleft()
+                (dt, tm) = read_posix_ts_mil(dl[1])
                 data[line_num]['date'] = dt
                 data[line_num]['time'] = tm
-                data[line_num]['last'] = np.float64(last)
-                data[line_num]['last_sz'] = np.uint64(last_sz)
-                data[line_num]['last_type'] = last_type
-                data[line_num]['mkt_ctr'] = np.uint32(mkt_center)
-                data[line_num]['tot_vlm'] = np.uint64(tot_vlm)
-                data[line_num]['bid'] = np.float64(bid)
-                data[line_num]['ask'] = np.float64(ask)
+                data[line_num]['last'] = np.float64(dl[2])
+                data[line_num]['last_sz'] = np.uint64(dl[3])
+                data[line_num]['tot_vlm'] = np.uint64(dl[4])
+                data[line_num]['bid'] = np.float64(dl[5])
+                data[line_num]['ask'] = np.float64(dl[6])
+                data[line_num]['tick_id'] = np.uint64(dl[7])
+                data[line_num]['last_type'] = dl[8]
+                data[line_num]['mkt_ctr'] = np.uint32(dl[9])
+
+                cond_str = dl[10]
                 num_cond = len(cond_str) / 2
                 if num_cond > 0:
                     data[line_num]['cond1'] = np.uint8(int(cond_str[0:2], 16))
@@ -1220,7 +1213,7 @@ class HistoryConn(FeedConn):
         self._setup_request_data(req_id)
         req_cmd = "HTX,%s,%d,%d,%s,\r\n" % (ticker, max_ticks, ascend, req_id)
         self.send_cmd(req_cmd)
-        self._req_event[req_id].wait(timeout = timeout)
+        self._req_event[req_id].wait(timeout=timeout)
         data = self.read_ticks(req_id)
         if data.dtype == object:
             err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
@@ -1239,7 +1232,7 @@ class HistoryConn(FeedConn):
         mt_str = blob_to_str(max_ticks)
         req_cmd = "HTD,%s,%d,%s,%s,%s,%d,%s,\r\n" % (ticker, num_days, mt_str, bf_str, ef_str, ascend, req_id)
         self.send_cmd(req_cmd)
-        self._req_event[req_id].wait(timeout = timeout)
+        self._req_event[req_id].wait(timeout=timeout)
         data = self.read_ticks(req_id)
         if data.dtype == object:
             err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
@@ -1247,6 +1240,7 @@ class HistoryConn(FeedConn):
         else:
             return data
 
+    # noinspection PyPep8
     def request_ticks_in_period(self, ticker: str, bgn_prd: datetime.datetime, end_prd: datetime.datetime,
                                 bgn_flt: datetime.time=None, end_flt: datetime.time=None, ascend: bool=False,
                                 max_ticks: int=None, timeout: int=None) -> np.array:
@@ -1260,7 +1254,7 @@ class HistoryConn(FeedConn):
         mt_str = blob_to_str(max_ticks)
         req_cmd = "HTT,%s,%s,%s,%s,%s,%s,%d,%s,\r\n" % (ticker, bp_str, ep_str, mt_str, bf_str, ef_str, ascend, req_id)
         self.send_cmd(req_cmd)
-        self._req_event[req_id].wait(timeout = timeout)
+        self._req_event[req_id].wait(timeout=timeout)
         data = self.read_ticks(req_id)
         if data.dtype == object:
             err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
@@ -1276,18 +1270,17 @@ class HistoryConn(FeedConn):
             data = np.empty(res.num_pts, HistoryConn.bar_type)
             line_num = 0
             while res.raw_data and (line_num < res.num_pts):
-                [req_id, bar_time, high_p, low_p, open_p, close_p,
-                 tot_vlm, prd_vlm, num_trds, empty] = res.raw_data.popleft()
-                (dt, tm) = read_posix_ts(bar_time)
+                dl = res.raw_data.popleft()
+                (dt, tm) = read_posix_ts(dl[1])
                 data[line_num]['date'] = dt
                 data[line_num]['time'] = tm
-                data[line_num]['open_p'] = np.float64(open_p)
-                data[line_num]['high_p'] = np.float64(high_p)
-                data[line_num]['low_p'] = np.float64(low_p)
-                data[line_num]['close_p'] = np.float64(close_p)
-                data[line_num]['tot_vlm'] = np.int64(tot_vlm)
-                data[line_num]['prd_vlm'] = np.int64(prd_vlm)
-                data[line_num]['num_trds'] = np.int64(num_trds)
+                data[line_num]['high_p'] = np.float64(dl[2])
+                data[line_num]['low_p'] = np.float64(dl[3])
+                data[line_num]['open_p'] = np.float64(dl[4])
+                data[line_num]['close_p'] = np.float64(dl[5])
+                data[line_num]['tot_vlm'] = np.int64(dl[6])
+                data[line_num]['prd_vlm'] = np.int64(dl[7])
+                data[line_num]['num_trds'] = np.int64(dl[8])
                 line_num += 1
                 if line_num >= res.num_pts:
                     assert len(res.raw_data) == 0
@@ -1296,7 +1289,7 @@ class HistoryConn(FeedConn):
             return data
 
     def request_bars(self, ticker: str, interval_len: int, interval_type: str, max_bars: int,
-                    ascend: bool=False, timeout: int=None) -> np.array:
+                     ascend: bool=False, timeout: int=None) -> np.array:
         # HIX,[Symbol],[Interval],[MaxDatapoints],[DataDirection],[RequestID],[DatapointsPerSend],[IntervalType]<CR><LF>
         assert interval_type in ('s', 'v', 't')
         req_id = self._get_next_req_id()
@@ -1332,6 +1325,7 @@ class HistoryConn(FeedConn):
         else:
             return data
 
+    # noinspection PyPep8
     def request_bars_in_period(self, ticker: str, interval_len: int, interval_type: str,
                                bgn_prd: datetime.datetime, end_prd: datetime.datetime,
                                bgn_flt: datetime.time=None, end_flt: datetime.time=None, ascend: bool=False,
@@ -1357,6 +1351,7 @@ class HistoryConn(FeedConn):
         else:
             return data
 
+    # noinspection PyUnresolvedReferences
     def read_days(self, req_id: str) -> np.array:
         res = self.get_data_buf(req_id)
         if res.failed:
@@ -1365,15 +1360,14 @@ class HistoryConn(FeedConn):
             data = np.empty(res.num_pts, HistoryConn.daily_type)
             line_num = 0
             while res.raw_data and (line_num < res.num_pts):
-                [req_id, date_stamp, high_p, low_p, open_p, close_p,
-                 prd_vlm, open_int, empty] = res.raw_data.popleft()
-                data[line_num]['date'] = np.datetime64(date_stamp, 'D')
-                data[line_num]['open_p'] = np.float64(open_p)
-                data[line_num]['high_p'] = np.float64(high_p)
-                data[line_num]['low_p'] = np.float64(low_p)
-                data[line_num]['close_p'] = np.float64(close_p)
-                data[line_num]['prd_vlm'] = np.uint64(prd_vlm)
-                data[line_num]['open_int'] = np.uint64(open_int)
+                dl = res.raw_data.popleft()
+                data[line_num]['date'] = np.datetime64(dl[1], 'D')
+                data[line_num]['high_p'] = np.float64(dl[2])
+                data[line_num]['low_p'] = np.float64(dl[3])
+                data[line_num]['open_p'] = np.float64(dl[4])
+                data[line_num]['close_p'] = np.float64(dl[5])
+                data[line_num]['prd_vlm'] = np.uint64(dl[6])
+                data[line_num]['open_int'] = np.uint64(dl[7j])
                 line_num += 1
                 if line_num >= res.num_pts:
                     assert len(res.raw_data) == 0
@@ -1386,7 +1380,6 @@ class HistoryConn(FeedConn):
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
         req_cmd = "HDX,%s,%d,%d,%s,\r\n" % (ticker, num_days, ascend, req_id)
-        print(req_cmd)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_days(req_id)
@@ -1466,14 +1459,14 @@ class TableConn(FeedConn):
     naic_type = np.dtype([('naic', 'u8'),
                           ('name', 'S128')])
 
-    def __init__(self, name:str = "TableConn", host: str = FeedConn.host, port: int = port):
+    def __init__(self, name: str = "TableConn", host: str = FeedConn.host, port: int = port):
         super().__init__(name, host, port)
 
         self.markets = None
         self.security_types = None
         self.trade_conds = None
         self.sics = None
-        self.naics= None
+        self.naics = None
 
         self._current_deque = deque()
         self._current_event = threading.Event()
@@ -1549,7 +1542,6 @@ class TableConn(FeedConn):
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
-                    print(data_list)
                     self.markets[line_num]['mkt_id'] = read_uint64(data_list[0])
                     self.markets[line_num]['short_name'] = data_list[1]
                     self.markets[line_num]['name'] = data_list[2]
@@ -1575,7 +1567,6 @@ class TableConn(FeedConn):
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
-                    [sec_type_str, short_name_str, name_str, junk] = data_list
                     self.security_types[line_num]['sec_type'] = read_uint64(data_list[0])
                     self.security_types[line_num]['short_name'] = data_list[1]
                     self.security_types[line_num]['name'] = data_list[2]
@@ -1622,7 +1613,6 @@ class TableConn(FeedConn):
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
-                    print(data_list)
                     self.sics[line_num]['sic'] = read_uint64(data_list[0])
                     self.sics[line_num]['name'] = ",".join(data_list[1:])
                     line_num += 1
@@ -1655,6 +1645,11 @@ class TableConn(FeedConn):
             else:
                 raise RuntimeError("Update NAIC codes timed out")
 
+
+class LookupConn(FeedConn):
+    pass
+
+
 if __name__ == "__main__":
     from service import FeedService
     from passwords import dtn_login, dtn_password, dtn_product_id
@@ -1670,7 +1665,6 @@ if __name__ == "__main__":
     # time.sleep(30)
     # admin_conn.client_stats_off()
     # admin_conn.stop_runner()
-
 
     # quote_conn = QuoteConn(name="RunningInIDE")
     # quote_conn.start_runner()
@@ -1730,12 +1724,14 @@ if __name__ == "__main__":
     #
     # monthly = hist_conn.request_monthly_data("INTC", 12)
     # print(monthly)
+    #
+    # table_conn = TableConn(name="RunningInIDE")
+    # table_conn.update_tables()
+    # print(table_conn.get_markets())
+    # print(table_conn.get_security_types())
+    # print(table_conn.get_trade_conditions())
+    # print(table_conn.get_sic_codes())
+    # print(table_conn.get_naic_codes())
 
-    table_conn = TableConn(name="RunningInIDE")
-    table_conn.update_tables()
-    print(table_conn.get_markets())
-    print(table_conn.get_security_types())
-    print(table_conn.get_trade_conditions())
-    print(table_conn.get_sic_codes())
-    print(table_conn.get_naic_codes())
+
 
