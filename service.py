@@ -39,5 +39,6 @@ class FeedService:
 
 
 if __name__ == "__main__":
-    feed = FeedService(product = "ASHWIN_KAPUR_11966", version="DebuggingLibInIDE", login="451945", password="b2vmxdvs", autoconnect=True, savelogininfo=True)
+    from passwords import dtn_product_id, dtn_login, dtn_password
+    feed = FeedService(product = dtn_product_id, version="TestingInIDE", login=dtn_login, password=dtn_password, autoconnect=True, savelogininfo=True)
     feed.launch()
