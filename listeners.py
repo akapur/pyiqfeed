@@ -16,7 +16,7 @@ class SilentIQFeedListener:
     def process_conn_stats(self, stats: dict) -> None:
         pass
 
-    def process_timestamp(self, time_val: ):
+    def process_timestamp(self, time_val: time.struct_time) -> None:
         pass
 
 
@@ -75,16 +75,14 @@ class SilentAdminListener(SilentIQFeedListener):
     def process_autoconnect_on(self) -> None:
         pass
 
-    def process_autoc0nnect_off(self) -> None:
+    def process_autoconnect_off(self) -> None:
         pass
 
     def process_client_stats(self, client_stats: dict) -> None:
         pass
 
 
-
-
-
+# noinspection PyMethodMayBeStatic
 class VerboseIQFeedListener:
 
     def feed_is_stale(self) -> None:
@@ -101,10 +99,11 @@ class VerboseIQFeedListener:
         print(stats)
 
     def process_timestamp(self, time_val: time.struct_time):
-        print(Time)
+        print("Timestamp:")
         print(time_val)
 
 
+# noinspection PyMethodMayBeStatic
 class VerboseQuoteListener(VerboseIQFeedListener):
     def process_invalid_symbol(self, bad_symbol: str) -> None:
         print("Invalid Symbol: %s" % bad_symbol)
@@ -143,32 +142,34 @@ class VerboseQuoteListener(VerboseIQFeedListener):
         print("Symbol Limit Reached with subscription to %s" % sym)
 
     def process_ip_addresses_used(self, ip: str) -> None:
-        print("IP Addresses Used: %s" %ip)
+        print("IP Addresses Used: %s" % ip)
 
 
+# noinspection PyMethodMayBeStatic
 class VerboseAdminListener(VerboseIQFeedListener):
 
     def process_register_client_app_completed(self) -> None:
-        pass
+        print("Register Client App Completed")
 
     def process_remove_client_app_completed(self) -> None:
-        pass
+        print("Remove Client App Completed")
 
     def process_current_login(self, login: str) -> None:
-        pass
+        print("Current Login: %s" % login)
 
     def process_current_password(self, password: str) -> None:
-        pass
+        print("Current Password: %s" % password)
 
     def process_login_info_saved(self) -> None:
-        pass
+        print("Login Info Saved")
 
     def process_autoconnect_on(self) -> None:
-        pass
+        print("Autoconnect On")
 
-    def process_autoc0nnect_off(self) -> None:
-        pass
+    def process_autoconnect_off(self) -> None:
+        print("Autoconnect Off")
 
     def process_client_stats(self, client_stats: dict) -> None:
-        pass
+        print("Client Stats:")
+        print(client_stats)
 

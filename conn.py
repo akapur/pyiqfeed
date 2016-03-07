@@ -1085,8 +1085,6 @@ class HistoryConn(FeedConn):
                            ('prd_vlm', 'u8'),
                            ('open_int', 'u8')])
 
-
-
     _databuf = namedtuple("_databuf", ['failed', 'err_msg', 'num_pts', 'raw_data'])
 
     def __init__(self, name: str = "HistoryConn", host: str = FeedConn.host, port: int = port):
@@ -1652,8 +1650,8 @@ class LookupConn(FeedConn):
     futures_month_letters = ('F', 'G', 'H', 'J', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z')
 
     equity_call_month_letters = ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
-    equity_call_month_letter_map = {1: 'A', 2: 'B', 3: 'C', 4:'D', 5:'E', 6:'F',
-                                    7:'G', 8:'H', 9:'I', 10:'J', 11:'K', 12:'L'}
+    equity_call_month_letter_map = {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F',
+                                    7: 'G', 8: 'H', 9: 'I', 10: 'J', 11: 'K', 12: 'L'}
     equity_put_month_letters = ('M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X')
     equity_put_month_letter_map = {1: 'M', 2: 'N', 3: 'O', 4: 'P', 5: 'Q', 6: 'R',
                                    7: 'S', 8: 'T', 9: 'U', 10: 'V', 11: 'W', 12: 'X'}
@@ -1843,6 +1841,7 @@ class LookupConn(FeedConn):
         assert month_codes is not None or near_months is not None
 
         if month_codes is not None:
+            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in LookupConn.futures_month_letters
 
@@ -1871,6 +1870,7 @@ class LookupConn(FeedConn):
         assert month_codes is not None or near_months is not None
 
         if month_codes is not None:
+            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in LookupConn.futures_month_letters
 
@@ -1911,7 +1911,7 @@ class LookupConn(FeedConn):
     def request_futures_option_chain(self, symbol: str, opt_type: str = 'pc',
                                      month_codes: str = None, years: str = None,
                                      near_months: int = None, timeout: int = None) -> dict:
-        #CFO,[Symbol],[Puts/Calls],[Month Codes],[Years],[Near Months],[RequestID]<CR><LF>
+        # CFO,[Symbol],[Puts/Calls],[Month Codes],[Years],[Near Months],[RequestID]<CR><LF>
         assert (symbol is not None) and (symbol != '')
 
         assert opt_type is not None
@@ -1923,6 +1923,7 @@ class LookupConn(FeedConn):
         assert month_codes is not None or near_months is not None
 
         if month_codes is not None:
+            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in LookupConn.futures_month_letters
 
@@ -1943,10 +1944,10 @@ class LookupConn(FeedConn):
             return data
 
     def request_equity_option_chain(self, symbol: str, opt_type: str = 'pc',
-                                month_codes: str = None, near_months: int = None,
-                                include_binary: bool = True,
-                                filt_type: int = 0, filt_val_1: float = None, filt_val_2: float = None,
-                                timeout: int = None) -> List[str]:
+                                    month_codes: str = None, near_months: int = None,
+                                    include_binary: bool = True,
+                                    filt_type: int = 0, filt_val_1: float = None, filt_val_2: float = None,
+                                    timeout: int = None) -> List[str]:
         # CEO,[Symbol],[Puts/Calls],[Month Codes],[Near Months],[BinaryOptions],[Filter Type],
         # [Filter Value One],[Filter Value Two],[RequestID]<CR><LF>
         assert (symbol is not None) and (symbol != '')
@@ -1967,6 +1968,7 @@ class LookupConn(FeedConn):
                 valid_month_codes = LookupConn.equity_call_month_letters
             elif opt_type == 'cp' or opt_type == 'pc':
                 valid_month_codes = (LookupConn.equity_call_month_letters + LookupConn.equity_put_month_letters)
+            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in valid_month_codes
         assert filt_type in (0, 1, 2)
@@ -2031,7 +2033,7 @@ if __name__ == "__main__":
 
     ticks = hist_conn.request_ticks_for_days("INTC", 1,
                                              datetime.time(hour=9, minute=30, second=0),
-                                             datetime.time(hour=16,minute=0, second=0),
+                                             datetime.time(hour=16, minute=0, second=0),
                                              max_ticks=100)
     print(ticks)
 
@@ -2046,7 +2048,7 @@ if __name__ == "__main__":
 
     bars = hist_conn.request_bars_for_days("INTC", 60, 's', 1,
                                            datetime.time(hour=9, minute=30, second=0),
-                                           datetime.time(hour=16,minute=0, second=0), max_bars=100)
+                                           datetime.time(hour=16, minute=0, second=0), max_bars=100)
     print(bars)
 
     bars = hist_conn.request_bars_in_period("INTC", 60, 's',
@@ -2058,7 +2060,7 @@ if __name__ == "__main__":
     daily = hist_conn.request_daily_data("@VXH16", 10)
     print(daily)
 
-    daily = hist_conn.request_daily_data_for_dates("INTC", datetime.date(2016, 1, 1), datetime.date(2016,3,4))
+    daily = hist_conn.request_daily_data_for_dates("INTC", datetime.date(2016, 1, 1), datetime.date(2016, 3, 4))
     print(daily)
 
     weekly = hist_conn.request_weekly_data("INTC", 10)
@@ -2111,10 +2113,11 @@ if __name__ == "__main__":
 
     e_opt = lookup_conn.request_equity_option_chain(symbol="INTC",
                                                     opt_type='pc',
-                                                    month_codes="".join(LookupConn.equity_call_month_letters+LookupConn.equity_put_month_letters),
+                                                    month_codes="".join(LookupConn.equity_call_month_letters +
+                                                                        LookupConn.equity_put_month_letters),
                                                     near_months=None,
                                                     include_binary=True,
-                                                    filt_type=0, filt_val_1=None,filt_val_2=None,
+                                                    filt_type=0, filt_val_1=None, filt_val_2=None,
                                                     timeout=None)
     print(e_opt)
 
