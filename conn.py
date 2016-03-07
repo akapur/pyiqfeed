@@ -252,9 +252,9 @@ class FeedConn:
         self._host = host
         self._port = port
         self._sock.connect((host, port))
-        self.set_protocol(FeedConn.protocol)
-        self.set_client_name(self._name)
-        self.send_connect_message()
+        self._set_protocol(FeedConn.protocol)
+        self._set_client_name(self._name)
+        self._send_connect_message()
 
     def disconnect(self) -> None:
         self.stop_runner()
@@ -426,7 +426,6 @@ class FeedConn:
     def process_error(self, fields: Sequence[str]) -> None:
         assert fields[0] == "E"
         assert len(fields) > 1
-        print("process_error: %s" % ",".join(fields))
         for listener in self._listeners:
             listener.process_error(fields)
 
@@ -438,17 +437,17 @@ class FeedConn:
         if listener in self._listeners:
             self._listeners.remove(listener)
 
-    def set_protocol(self, protocol) -> None:
+    def _set_protocol(self, protocol) -> None:
         self.send_cmd("S,SET PROTOCOL,%s\r\n" % protocol)
 
-    def send_connect_message(self) -> None:
+    def _send_connect_message(self) -> None:
         msg = "S,CONNECT\r\n"
         self.send_cmd(msg)
 
     def send_disconnect_message(self) -> None:
         self.send_cmd("S,DISCONNECT\r\n")
 
-    def set_client_name(self, name) -> None:
+    def _set_client_name(self, name) -> None:
         self._name = name
         msg = "S,SET CLIENT NAME,%s\r\n" % name
         self.send_cmd(msg)
@@ -624,7 +623,7 @@ class QuoteConn(FeedConn):
         assert fields[0] == 'n'
         bad_sym = fields[1]
         for listener in self._listeners:
-            listener.process_bad_symbol_error(bad_sym)
+            listener.process_invalid_symbol(bad_sym)
 
     def process_news(self, fields: Sequence[str]):
         assert len(fields) > 5
@@ -664,7 +663,7 @@ class QuoteConn(FeedConn):
         assert fields[0] == "P"
         update = self.create_update(fields)
         for listener in self._listeners:
-            listener.process_update(update)
+            listener.process_summary(update)
 
     def process_update(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
@@ -800,7 +799,6 @@ class QuoteConn(FeedConn):
         assert len(fields) > 2
         assert fields[0] == 'S'
         assert fields[1] == 'UPDATE FIELDNAMES'
-        # Raise exception instead of printing after debugging
         for field in fields[2:]:
             if field not in QuoteConn.quote_msg_map:
                 raise RuntimeError("Protocol Conflict: %s not found in QuoteConn.dtn_update_map" % field)
@@ -1106,7 +1104,7 @@ class HistoryConn(FeedConn):
         super()._set_message_mappings()
         self._pf_dict['H'] = self.process_datum
 
-    def send_connect_message(self):
+    def _send_connect_message(self):
         # The history socket does not accept connect messages
         pass
 
@@ -1367,7 +1365,7 @@ class HistoryConn(FeedConn):
                 data[line_num]['open_p'] = np.float64(dl[4])
                 data[line_num]['close_p'] = np.float64(dl[5])
                 data[line_num]['prd_vlm'] = np.uint64(dl[6])
-                data[line_num]['open_int'] = np.uint64(dl[7j])
+                data[line_num]['open_int'] = np.uint64(dl[7])
                 line_num += 1
                 if line_num >= res.num_pts:
                     assert len(res.raw_data) == 0
@@ -1474,7 +1472,7 @@ class TableConn(FeedConn):
 
         self._update_lock = threading.RLock()
 
-    def send_connect_message(self):
+    def _send_connect_message(self):
         # The lookup/history socket does not accept connect messages
         pass
 
@@ -1649,6 +1647,17 @@ class TableConn(FeedConn):
 class LookupConn(FeedConn):
     port = 9100
 
+    futures_month_letter_map = {1: 'F', 2: 'G', 3: 'H', 4: 'J', 5: 'K', 6: 'M',
+                                7: 'N', 8: 'Q', 9: 'U', 10: 'V', 11: 'X', 12: 'Z'}
+    futures_month_letters = ('F', 'G', 'H', 'J', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z')
+
+    equity_call_month_letters = ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
+    equity_call_month_letter_map = {1: 'A', 2: 'B', 3: 'C', 4:'D', 5:'E', 6:'F',
+                                    7:'G', 8:'H', 9:'I', 10:'J', 11:'K', 12:'L'}
+    equity_put_month_letters = ('M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X')
+    equity_put_month_letter_map = {1: 'M', 2: 'N', 3: 'O', 4: 'P', 5: 'Q', 6: 'R',
+                                   7: 'S', 8: 'T', 9: 'U', 10: 'V', 11: 'W', 12: 'X'}
+
     asset_type = np.dtype([('symbol', 'S128'),
                            ('market', 'u1'),
                            ('security_type', 'u1'),
@@ -1657,7 +1666,7 @@ class LookupConn(FeedConn):
 
     _databuf = namedtuple("_databuf", ['failed', 'err_msg', 'num_pts', 'raw_data'])
 
-    def __init__(self, name: str = "LookupConn", host: str = FeedConn.host, port: int = port):
+    def __init__(self, name: str = "SymbolSearchConn", host: str = FeedConn.host, port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._req_num = 0
@@ -1672,8 +1681,8 @@ class LookupConn(FeedConn):
         super()._set_message_mappings()
         self._pf_dict['L'] = self.process_lookup_datum
 
-    def send_connect_message(self):
-        # The history socket does not accept connect messages
+    def _send_connect_message(self):
+        # The history/lookup socket does not accept connect messages
         pass
 
     def process_lookup_datum(self, fields: Sequence[str]) -> None:
@@ -1814,103 +1823,304 @@ class LookupConn(FeedConn):
         else:
             return data
 
+    def read_futures_chain(self, req_id: str) -> List[str]:
+        res = self.get_data_buf(req_id)
+        if res.failed:
+            return ["!ERROR!", res.err_msg]
+        else:
+            assert res.num_pts == 1
+            chain = res.raw_data[0][1:]
+            if chain[-1] == "":
+                chain = chain[:-1]
+            return chain
 
-# if __name__ == "__main__":
-    # from service import FeedService
-    # from passwords import dtn_login, dtn_password, dtn_product_id
+    def request_futures_chain(self, symbol: str, month_codes: str = None, years: str = None,
+                              near_months: int = None, timeout: int = None) -> List[str]:
+        # CFU,[Symbol],[Month Codes],[Years],[Near Months],[RequestID]<CR><LF>
+        assert (symbol is not None) and (symbol != '')
+
+        assert month_codes is None or near_months is None
+        assert month_codes is not None or near_months is not None
+
+        if month_codes is not None:
+            for month_code in month_codes:
+                assert month_code in LookupConn.futures_month_letters
+
+        if years is not None:
+            assert years.isdigit()
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+        req_cmd = "CFU,%s,%s,%s,%s,%s\r\n" % (symbol, blob_to_str(month_codes),
+                                              blob_to_str(years), blob_to_str(near_months), req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_futures_chain(req_id)
+        if (len(data) == 2) and (data[0] == "!ERROR!"):
+            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[1]))
+            raise RuntimeError(err_msg)
+        else:
+            return data
+
+    def request_futures_spread_chain(self, symbol: str, month_codes: str = None, years: str = None,
+                                     near_months: int = None, timeout: int = None) -> List[str]:
+        # CFS,[Symbol],[Month Codes],[Years],[Near Months],[RequestID]<CR><LF>
+        assert (symbol is not None) and (symbol != '')
+
+        assert month_codes is None or near_months is None
+        assert month_codes is not None or near_months is not None
+
+        if month_codes is not None:
+            for month_code in month_codes:
+                assert month_code in LookupConn.futures_month_letters
+
+        if years is not None:
+            assert years.isdigit()
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+        req_cmd = "CFS,%s,%s,%s,%s,%s\r\n" % (symbol, blob_to_str(month_codes),
+                                              blob_to_str(years), blob_to_str(near_months), req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_futures_chain(req_id)
+        if (len(data) == 2) and (data[0] == "!ERROR!"):
+            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[1]))
+            raise RuntimeError(err_msg)
+        else:
+            return data
+
+    def read_option_chain(self, req_id: str) -> dict:
+        res = self.get_data_buf(req_id)
+        if res.failed:
+            return ["!ERROR!", res.err_msg]
+        else:
+            assert res.num_pts == 1
+            symbols = res.raw_data[0][1:]
+            cp_delim = symbols.index(':')
+            call_symbols = symbols[:cp_delim]
+            if len(call_symbols) > 0:
+                if call_symbols[-1] == "":
+                    call_symbols = call_symbols[:-1]
+            put_symbols = symbols[cp_delim+1:]
+            if len(put_symbols) > 0:
+                if put_symbols[-1] == "":
+                    put_symbols = put_symbols[:-1]
+            return {"c": call_symbols, "p": put_symbols}
+
+    def request_futures_option_chain(self, symbol: str, opt_type: str = 'pc',
+                                     month_codes: str = None, years: str = None,
+                                     near_months: int = None, timeout: int = None) -> dict:
+        #CFO,[Symbol],[Puts/Calls],[Month Codes],[Years],[Near Months],[RequestID]<CR><LF>
+        assert (symbol is not None) and (symbol != '')
+
+        assert opt_type is not None
+        assert len(opt_type) in (1, 2)
+        for op in opt_type:
+            assert op in ('p', 'c')
+
+        assert month_codes is None or near_months is None
+        assert month_codes is not None or near_months is not None
+
+        if month_codes is not None:
+            for month_code in month_codes:
+                assert month_code in LookupConn.futures_month_letters
+
+        if years is not None:
+            assert years.isdigit()
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+        req_cmd = "CFO,%s,%s,%s,%s,%s,%s\r\n" % (symbol, opt_type, blob_to_str(month_codes),
+                                                 blob_to_str(years), blob_to_str(near_months), req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_option_chain(req_id)
+        if (type(data) == list) and (data[0] == "!ERROR!"):
+            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[1]))
+            raise RuntimeError(err_msg)
+        else:
+            return data
+
+    def request_equity_option_chain(self, symbol: str, opt_type: str = 'pc',
+                                month_codes: str = None, near_months: int = None,
+                                include_binary: bool = True,
+                                filt_type: int = 0, filt_val_1: float = None, filt_val_2: float = None,
+                                timeout: int = None) -> List[str]:
+        # CEO,[Symbol],[Puts/Calls],[Month Codes],[Near Months],[BinaryOptions],[Filter Type],
+        # [Filter Value One],[Filter Value Two],[RequestID]<CR><LF>
+        assert (symbol is not None) and (symbol != '')
+
+        assert opt_type is not None
+        assert len(opt_type) in (1, 2)
+        for op in opt_type:
+            assert op in ('p', 'c')
+
+        assert month_codes is None or near_months is None
+        assert month_codes is not None or near_months is not None
+
+        if month_codes is not None:
+            valid_month_codes = ()
+            if opt_type == 'p':
+                valid_month_codes = LookupConn.equity_put_month_letters
+            elif opt_type == 'c':
+                valid_month_codes = LookupConn.equity_call_month_letters
+            elif opt_type == 'cp' or opt_type == 'pc':
+                valid_month_codes = (LookupConn.equity_call_month_letters + LookupConn.equity_put_month_letters)
+            for month_code in month_codes:
+                assert month_code in valid_month_codes
+        assert filt_type in (0, 1, 2)
+        if filt_type != 0:
+            assert filt_val_1 is not None and filt_val_1 > 0
+            assert filt_val_2 is not None and filt_val_2 > 0
+        if filt_type == 1:
+            assert filt_val_1 < filt_val_2
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+        req_cmd = "CEO,%s,%s,%s,%s,%d,%d,%s,%s,%s\r\n" % (symbol, opt_type,
+                                                          blob_to_str(month_codes), blob_to_str(near_months),
+                                                          include_binary,
+                                                          filt_type, blob_to_str(filt_val_1), blob_to_str(filt_val_2),
+                                                          req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_option_chain(req_id)
+        if (type(data) == list) and (data[0] == "!ERROR!"):
+            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[1]))
+            raise RuntimeError(err_msg)
+        else:
+            return data
+
+
+if __name__ == "__main__":
+    from service import FeedService
+    from passwords import dtn_login, dtn_password, dtn_product_id
+
+    svc = FeedService(product=dtn_product_id, version="Debugging", login=dtn_login, password=dtn_password,
+                      autoconnect=True, savelogininfo=True)
+    svc.launch()
+
+    admin_conn = AdminConn(name="RunningInIde")
+    admin_conn.start_runner()
+    admin_conn.set_admin_variables_from_dict(svc.admin_variables())
+    admin_conn.client_stats_on()
+    time.sleep(30)
+    admin_conn.client_stats_off()
+    admin_conn.stop_runner()
+
+    quote_conn = QuoteConn(name="RunningInIDE")
+    quote_conn.start_runner()
+
+    quote_conn.request_all_update_fieldnames()
+    quote_conn.request_current_update_fieldnames()
+    quote_conn.request_fundamental_fieldnames()
+    all_fields = sorted(list(QuoteConn.quote_msg_map.keys()))
+    quote_conn.select_update_fieldnames(all_fields)
+    quote_conn.watch("@VXH16")
+    time.sleep(30)
+    quote_conn.unwatch("@VXH16")
+    print("Unwatched")
+    time.sleep(3)
+    quote_conn.stop_runner()
+
+    hist_conn = HistoryConn(name="RunningInIde")
+    hist_conn.start_runner()
+
+    ticks = hist_conn.request_ticks("INTC", 10)
+    print(ticks)
+
+    ticks = hist_conn.request_ticks_for_days("INTC", 1,
+                                             datetime.time(hour=9, minute=30, second=0),
+                                             datetime.time(hour=16,minute=0, second=0),
+                                             max_ticks=100)
+    print(ticks)
+
+    ticks = hist_conn.request_ticks_in_period("INTC",
+                                              datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30),
+                                              datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30),
+                                              max_ticks=100)
+    print(ticks)
+
+    bars = hist_conn.request_bars("INTC", 60, 's', 10)
+    print(bars)
+
+    bars = hist_conn.request_bars_for_days("INTC", 60, 's', 1,
+                                           datetime.time(hour=9, minute=30, second=0),
+                                           datetime.time(hour=16,minute=0, second=0), max_bars=100)
+    print(bars)
+
+    bars = hist_conn.request_bars_in_period("INTC", 60, 's',
+                                            datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30, second=0),
+                                            datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30, second=0),
+                                            max_bars=100)
+    print(bars)
+
+    daily = hist_conn.request_daily_data("@VXH16", 10)
+    print(daily)
+
+    daily = hist_conn.request_daily_data_for_dates("INTC", datetime.date(2016, 1, 1), datetime.date(2016,3,4))
+    print(daily)
+
+    weekly = hist_conn.request_weekly_data("INTC", 10)
+    print(weekly)
+
+    monthly = hist_conn.request_monthly_data("INTC", 12)
+    print(monthly)
+
+    table_conn = TableConn(name="RunningInIDE")
+    table_conn.update_tables()
+    print(table_conn.get_markets())
+    print(table_conn.get_security_types())
+    print(table_conn.get_trade_conditions())
+    print(table_conn.get_sic_codes())
+    print(table_conn.get_naic_codes())
+
+    lookup_conn = LookupConn(name="RunningInIDE")
+    lookup_conn.start_runner()
+
+    tesla_syms = lookup_conn.request_symbols_by_filter(search_term='TSLA', search_field='s')
+    print(tesla_syms)
+
+    sic_symbols = lookup_conn.request_symbols_by_sic(83)
+    print(sic_symbols)
+
+    naic_symbols = lookup_conn.request_symbols_by_naic(10)
+    print(naic_symbols)
     #
-    # svc = FeedService(product=dtn_product_id, version="Debugging", login=dtn_login, password=dtn_password,
-    #                   autoconnect=True, savelogininfo=True)
-    # svc.launch()
+    f_syms = lookup_conn.request_futures_chain(symbol="@VX",
+                                               month_codes="".join(LookupConn.futures_month_letters),
+                                               years="67",
+                                               near_months=None,
+                                               timeout=None)
+    print(f_syms)
+
+    f_spread = lookup_conn.request_futures_spread_chain(symbol="@VX",
+                                                        month_codes="".join(LookupConn.futures_month_letters),
+                                                        years="67",
+                                                        near_months=None,
+                                                        timeout=None)
+    print(f_spread)
     #
-    # admin_conn = AdminConn(name="RunningInIde")
-    # admin_conn.start_runner()
-    # admin_conn.set_admin_variables_from_dict(svc.admin_variables())
-    # admin_conn.client_stats_on()
-    # time.sleep(30)
-    # admin_conn.client_stats_off()
-    # admin_conn.stop_runner()
-    #
-    # quote_conn = QuoteConn(name="RunningInIDE")
-    # quote_conn.start_runner()
-    #
-    # quote_conn.request_all_update_fieldnames()
-    # quote_conn.request_current_update_fieldnames()
-    # quote_conn.request_fundamental_fieldnames()
-    # all_fields = sorted(list(QuoteConn.quote_msg_map.keys()))
-    # quote_conn.select_update_fieldnames(all_fields)
-    # quote_conn.watch("@VXH16")
-    # time.sleep(30)
-    # quote_conn.unwatch("@VXH16")
-    # print("Unwatched")
-    # time.sleep(3)
-    # quote_conn.stop_runner()
-    #
-    # hist_conn = HistoryConn(name="RunningInIde")
-    # hist_conn.start_runner()
-    #
-    # ticks = hist_conn.request_ticks("INTC", 10)
-    # print(ticks)
-    #
-    # ticks = hist_conn.request_ticks_for_days("INTC", 1,
-    #                                          datetime.time(hour=9, minute=30, second=0),
-    #                                          datetime.time(hour=16,minute=0, second=0),
-    #                                          max_ticks=100)
-    # print(ticks)
-    #
-    # ticks = hist_conn.request_ticks_in_period("INTC",
-    #                                           datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30),
-    #                                           datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30),
-    #                                           max_ticks=100)
-    # print(ticks)
-    #
-    # bars = hist_conn.request_bars("INTC", 60, 's', 10)
-    # print(bars)
-    #
-    # bars = hist_conn.request_bars_for_days("INTC", 60, 's', 1,
-    #                                        datetime.time(hour=9, minute=30, second=0),
-    #                                        datetime.time(hour=16,minute=0, second=0), max_bars=100)
-    # print(bars)
-    #
-    # bars = hist_conn.request_bars_in_period("INTC", 60, 's',
-    #                                         datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30, second=0),
-    #                                         datetime.datetime(year=2016, month=3, day=4, hour=9, minute=30, second=0),
-    #                                         max_bars=100)
-    # print(bars)
-    #
-    # daily = hist_conn.request_daily_data("@VXH16", 10)
-    # print(daily)
-    #
-    # daily = hist_conn.request_daily_data_for_dates("INTC", datetime.date(2016, 1, 1), datetime.date(2016,3,4))
-    # print(daily)
-    #
-    # weekly = hist_conn.request_weekly_data("INTC", 10)
-    # print(weekly)
-    #
-    # monthly = hist_conn.request_monthly_data("INTC", 12)
-    # print(monthly)
-    #
-    # table_conn = TableConn(name="RunningInIDE")
-    # table_conn.update_tables()
-    # print(table_conn.get_markets())
-    # print(table_conn.get_security_types())
-    # print(table_conn.get_trade_conditions())
-    # print(table_conn.get_sic_codes())
-    # print(table_conn.get_naic_codes())
-    #
-    # lookup_conn = LookupConn(name="RunningInIDE")
-    # lookup_conn.start_runner()
-    #
-    # tesla_syms = lookup_conn.request_symbols_by_filter(search_term='INTC',
-    #                                                    search_field='s')
-    # print(tesla_syms)
-    #
-    # sic_symbols = lookup_conn.request_symbols_by_sic(83)
-    # print(sic_symbols)
-    #
-    # naic_symbols = lookup_conn.request_symbols_by_naic(10)
-    # print(naic_symbols)
-    #
-    # lookup_conn.stop_runner()
-    #
+    f_opt = lookup_conn.request_futures_option_chain(symbol="CL",
+                                                     opt_type='pc',
+                                                     month_codes="".join(LookupConn.futures_month_letters),
+                                                     years="67",
+                                                     near_months=None,
+                                                     timeout=None)
+    # print(f_opt)
+
+    e_opt = lookup_conn.request_equity_option_chain(symbol="INTC",
+                                                    opt_type='pc',
+                                                    month_codes="".join(LookupConn.equity_call_month_letters+LookupConn.equity_put_month_letters),
+                                                    near_months=None,
+                                                    include_binary=True,
+                                                    filt_type=0, filt_val_1=None,filt_val_2=None,
+                                                    timeout=None)
+    print(e_opt)
+
+    lookup_conn.stop_runner()
+
+
+
+
 
