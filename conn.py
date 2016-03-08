@@ -7,7 +7,6 @@ import itertools
 import numpy as np
 from collections import deque, namedtuple
 from typing import Sequence, List, Callable, Tuple
-from listeners import VerboseIQFeedListener, VerboseAdminListener, VerboseQuoteListener
 
 
 def blob_to_str(val) -> str:
@@ -2017,6 +2016,7 @@ class LookupConn(FeedConn):
 
 if __name__ == "__main__":
     from service import FeedService
+    from listeners import VerboseIQFeedListener, VerboseAdminListener, VerboseQuoteListener
     from passwords import dtn_login, dtn_password, dtn_product_id
 
     svc = FeedService(product=dtn_product_id, version="Debugging", login=dtn_login, password=dtn_password,
