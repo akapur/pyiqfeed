@@ -7,6 +7,7 @@ import itertools
 import numpy as np
 from collections import deque, namedtuple
 from typing import Sequence, List, Callable, Tuple
+from listeners import VerboseIQFeedListener, VerboseAdminListener, VerboseQuoteListener
 
 
 def blob_to_str(val) -> str:
@@ -117,6 +118,26 @@ def read_mmddccyy(field: str) -> np.datetime64:
         return np.datetime64(datetime.date(year=year, month=month, day=day), 'D')
     else:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
+
+
+def read_ccyymmdd(field: str) -> np.datetime64:
+    if field != "":
+        year = int(field[0:4])
+        month = int(field[4:6])
+        day = int(field[6:8])
+        return np.datetime64(datetime.date(year=year, month=month, day=day), 'D')
+    else:
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
+
+
+def read_dtn_timestamp(dt_tm: str) -> Tuple[np.datetime64, int]:
+    if dt_tm != "":
+        (date_str, time_str) = dt_tm.split(' ')
+        dt = read_ccyymmdd(date_str)
+        tm = read_hhmmss(time_str)
+        return dt, tm
+    else:
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
 # noinspection PyUnresolvedReferences
@@ -416,12 +437,12 @@ class FeedConn:
             listener.process_conn_stats(conn_stats)
 
     def process_timestamp(self, fields: Sequence[str]) -> None:
+        # T,[YYYYMMDD HH:MM:SS]
         assert fields[0] == "T"
         assert len(fields) > 1
-        # TODO: Change to a tuple of np.datetime64 and millisecs since midnight
-        time_val = time.strptime("%s EST" % fields[1], "%Y%m%d %H:%M:%S %Z")
+        dt_tm_tuple = read_dtn_timestamp(fields[1])
         for listener in self._listeners:
-            listener.process_timestamp(time_val)
+            listener.process_timestamp(dt_tm_tuple)
 
     def process_error(self, fields: Sequence[str]) -> None:
         assert fields[0] == "E"
@@ -2003,14 +2024,15 @@ if __name__ == "__main__":
     svc.launch()
 
     admin_conn = AdminConn(name="RunningInIde")
+    admin_listener = VerboseAdminListener("AdminListener")
+    admin_conn.add_listener(admin_listener)
     admin_conn.start_runner()
     admin_conn.set_admin_variables_from_dict(svc.admin_variables())
     admin_conn.client_stats_on()
-    time.sleep(30)
-    admin_conn.client_stats_off()
-    admin_conn.stop_runner()
 
     quote_conn = QuoteConn(name="RunningInIDE")
+    quote_listener = VerboseQuoteListener("QuoteListener")
+    quote_conn.add_listener(quote_listener)
     quote_conn.start_runner()
 
     quote_conn.request_all_update_fieldnames()
@@ -2020,12 +2042,10 @@ if __name__ == "__main__":
     quote_conn.select_update_fieldnames(all_fields)
     quote_conn.watch("@VXH16")
     time.sleep(30)
-    quote_conn.unwatch("@VXH16")
-    print("Unwatched")
-    time.sleep(3)
-    quote_conn.stop_runner()
 
     hist_conn = HistoryConn(name="RunningInIde")
+    hist_listener = VerboseIQFeedListener("HistListener")
+    hist_conn.add_listener(hist_listener)
     hist_conn.start_runner()
 
     ticks = hist_conn.request_ticks("INTC", 10)
@@ -2070,6 +2090,8 @@ if __name__ == "__main__":
     print(monthly)
 
     table_conn = TableConn(name="RunningInIDE")
+    table_listener = VerboseIQFeedListener("TableListener")
+    table_conn.add_listener(table_listener)
     table_conn.update_tables()
     print(table_conn.get_markets())
     print(table_conn.get_security_types())
@@ -2078,6 +2100,8 @@ if __name__ == "__main__":
     print(table_conn.get_naic_codes())
 
     lookup_conn = LookupConn(name="RunningInIDE")
+    lookup_listener = VerboseIQFeedListener("LookupListener")
+    lookup_conn.add_listener(lookup_listener)
     lookup_conn.start_runner()
 
     tesla_syms = lookup_conn.request_symbols_by_filter(search_term='TSLA', search_field='s')
@@ -2121,7 +2145,15 @@ if __name__ == "__main__":
                                                     timeout=None)
     print(e_opt)
 
+    time.sleep(30)
+    admin_conn.client_stats_off()
+    quote_conn.unwatch("@VXH16")
+    print("Unwatched")
+    time.sleep(3)
+
     lookup_conn.stop_runner()
+    quote_conn.stop_runner()
+    admin_conn.stop_runner()
 
 
 
