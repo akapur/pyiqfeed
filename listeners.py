@@ -16,6 +16,7 @@ class SilentIQFeedListener:
     def process_conn_stats(self, stats: dict) -> None:
         pass
 
+    # noinspection PyUnresolvedReferences
     def process_timestamp(self, time_val: Tuple[np.datetime64, int]) -> None:
         pass
 
@@ -101,6 +102,7 @@ class VerboseIQFeedListener:
         print("%s: Connection Stats:" % self._name)
         print(stats)
 
+    # noinspection PyUnresolvedReferences
     def process_timestamp(self, time_val: Tuple[np.datetime64, int]):
         print("%s: Timestamp:" % self._name)
         print(time_val)

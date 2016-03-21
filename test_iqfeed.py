@@ -1,10 +1,9 @@
 import unittest
-from service import *
 from conn import *
 import datetime
 
-autoconnect=True
-savelogininfo=True
+autoconnect = True
+savelogininfo = True
 
 
 class TestReadFunctions(unittest.TestCase):
@@ -21,7 +20,7 @@ class TestReadFunctions(unittest.TestCase):
 
 class TestHistoryConn(unittest.TestCase):
     def setup(self):
-        self.feed = FeedService(product = dtn_product_id, version = version, login = dtn_login, password = dtn_password)
+        self.feed = FeedService(product=dtn_product_id, version=version, login=dtn_login, password=dtn_password)
         self.feed.launch()
         self.hist = HistoryConn("Unit Tester")
         self.hist.start_runner()
@@ -50,10 +49,10 @@ class TestHistoryConn(unittest.TestCase):
         bgn_flt = datetime.time(11, 30, 0)
         end_flt = datetime.time(11, 35, 0)
         ascend = True
-        max_ticks=500
+        max_ticks = 500
         data = self.hist.request_ticks_in_prd(ticker="MSFT", bgn_prd=bgn_prd, end_prd=end_prd,
-                                         bgn_flt=bgn_flt, end_flt=end_flt, ascend=ascend,
-                                         max_ticks=max_ticks)
+                                              bgn_flt=bgn_flt, end_flt=end_flt, ascend=ascend,
+                                              max_ticks=max_ticks)
         self.assertEqual(data.shape[0], 500)
         print("Last 8 days of ticks for MSFT between 11:30 and 11:35 in ascending order. Only 500 ticks:")
         print(data)
@@ -78,13 +77,13 @@ class TestHistoryConn(unittest.TestCase):
         end_flt = datetime.time(9, 31, 0)
 
         tick_bar_data = self.hist.request_bars_for_days(ticker="INTC", interval_len=10, interval_type='t', days=1,
-                                                   bgn_flt=bgn_flt, end_flt=end_flt)
+                                                        bgn_flt=bgn_flt, end_flt=end_flt)
         self.assertGreater(tick_bar_data.shape[0], 0)
         vlm_bar_data = self.hist.request_bars_for_days(ticker="INTC", interval_len=500, interval_type='v', days=1,
-                                                  bgn_flt=bgn_flt, end_flt=end_flt)
+                                                       bgn_flt=bgn_flt, end_flt=end_flt)
         self.assertGreater(vlm_bar_data.shape[0], 0)
         sec_bar_data = self.hist.request_bars_for_days(ticker="INTC", interval_len=30, interval_type='s', days=1,
-                                                  bgn_flt=bgn_flt, end_flt=end_flt)
+                                                       bgn_flt=bgn_flt, end_flt=end_flt)
         self.assertGreater(sec_bar_data.shape[0], 0)
 
         rn = datetime.datetime.now() - datetime.timedelta(days=7)
@@ -118,7 +117,6 @@ class TestHistoryConn(unittest.TestCase):
         monthly_data = self.hist.request_monthly_data(ticker="SPY", num_months=36, ascend=True)
         self.assertEqual(monthly_data.shape[0], 36)
         print(monthly_data)
-
 
 
 if __name__ == '__main__':
