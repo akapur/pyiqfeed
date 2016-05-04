@@ -1,5 +1,5 @@
-import time
 import os
+import time
 
 
 class FeedService:
@@ -49,7 +49,7 @@ class FeedService:
 
 
 if __name__ == "__main__":
-    from passwords import dtn_product_id, dtn_login, dtn_password
+    from pyiqfeed.passwords import dtn_product_id, dtn_login, dtn_password
     feed = FeedService(product=dtn_product_id,
                        version="TestingInIDE",
                        login=dtn_login,
