@@ -145,7 +145,7 @@ if __name__ == "__main__":
         timeout=None)
     print(e_opt)
 
-    time.sleep(20)
+    time.sleep(10)
     admin_conn.client_stats_off()
     quote_conn.unwatch("SPY")
     print("Unwatched")
