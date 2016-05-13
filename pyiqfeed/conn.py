@@ -2203,7 +2203,7 @@ class LookupConn(FeedConn):
                                     filt_type: int = 0,
                                     filt_val_1: float = None,
                                     filt_val_2: float = None,
-                                    timeout: int = None) -> List[str]:
+                                    timeout: int = None) -> dict:
         # CEO,[Symbol],[Puts/Calls],[Month Codes],[Near Months],
         # [BinaryOptions],[Filter Type],[Filter Value One],[Filter Value Two],
         # [RequestID]<CR><LF>
