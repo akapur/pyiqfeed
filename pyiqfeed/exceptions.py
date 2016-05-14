@@ -1,0 +1,3 @@
+
+class NoDataError(KeyError):
+    pass

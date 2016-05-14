@@ -6,6 +6,7 @@ import threading
 import time
 from collections import deque, namedtuple
 from typing import Sequence, List, Callable, Tuple
+from .exceptions import NoDataError
 
 import numpy as np
 
@@ -1343,8 +1344,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_ticks(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1367,8 +1372,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_ticks(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1396,8 +1405,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_ticks(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1442,8 +1455,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_bars(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1469,8 +1486,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_bars(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1503,8 +1524,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_bars(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1543,8 +1568,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_days(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1567,8 +1596,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_days(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1583,8 +1616,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_days(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
@@ -1599,8 +1636,12 @@ class HistoryConn(FeedConn):
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_days(req_id)
         if data.dtype == object:
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[0])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == '!NO_DATA!':
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
