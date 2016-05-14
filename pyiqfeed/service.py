@@ -35,7 +35,7 @@ class FeedService:
                                   win32con.SW_SHOWNORMAL)
         elif os.name == 'posix':
             import subprocess
-            iqfeed_call = "/port/bin/wine iqconnect.exe %s" % iqfeed_args
+            iqfeed_call = "wine iqconnect.exe %s" % iqfeed_args
             subprocess.Popen(iqfeed_call, shell=True,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL)
