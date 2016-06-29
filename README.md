@@ -19,9 +19,11 @@ For an example of how to use it do the following
 Create a file in the same directory as example.py called passwords.py. In this
 file you must define 3 variables:
 
+<pre><code>
  dtn_product_id = "PRODUCT_ID_GIVEN_TO_YOU_BY_DTN_WHEN_YOU_SIGNED_UP_FOR_IQFEED"
  dtn_login="Your_IQFEED_LOGIN"
  dtn_password="Your_IQFEED_PASSWORD"
+ </code></pre>
 
 Install the
 This exercises many different parts of the library. The best documentation for
