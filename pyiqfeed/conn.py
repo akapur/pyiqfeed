@@ -534,7 +534,8 @@ class QuoteConn(FeedConn):
                           "Calendar Year High Date", "Calendar Year Low Date",
                           "Year End Close", "Maturity Date", "Coupon Rate",
                           "Expiration Date",
-                          "Strike Price", "NAICS", "Exchange Root"]
+                          "Strike Price", "NAICS", "Exchange Root",
+                          "Option Premium Multiplier", "Option Multiple Deliverable"]
 
     fundamental_type = [('Symbol', 'S128'),
                         ('PE', 'f8'),
@@ -574,7 +575,9 @@ class QuoteConn(FeedConn):
                         ('Coupon Rate', 'f8'), ('Expiration Date', 'M8[D]'),
                         ('Strike Price', 'f8'),
                         ('NAICS', 'u8'),
-                        ('Exchange Root', 'S128')]
+                        ('Exchange Root', 'S128'),
+                        ('Option Premium Multiplier', 'f8'),
+                        ('Option Multiple Deliverable', 'u8') ]
 
     # noinspection PyPep8
     quote_msg_map = {'Symbol': ('Symbol', 'S128', lambda x: x),
@@ -843,6 +846,9 @@ class QuoteConn(FeedConn):
         msg['Strike Price'] = read_float64(fields[53])
         msg['NAICS'] = read_uint8(fields[54])
         msg['Exchange Root'] = fields[55]
+        msg['Option Premium Multiplier'] = read_float64(fields[56])
+        msg['Option Multiple Deliverable'] = read_uint8(fields[57])
+
         for listener in self._listeners:
             listener.process_fundamentals(msg)
 
