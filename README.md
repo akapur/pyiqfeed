@@ -1,5 +1,6 @@
 # pyiqfeed 
-Reads data from IQFeed (http://www.iqfeed.net)
+
+Reads data from IQFeed (http://www.iqfeed.net).
 
 Contains classes that can read market data from DTN's IQFeed service. You need
 a subscription to IQFeed or this won't work. This library is usually kept up
@@ -25,9 +26,8 @@ file you must define 3 variables:
  dtn_password="Your_IQFEED_PASSWORD"
  </code></pre>
 
-Install the
 This exercises many different parts of the library. The best documentation for
-the library is just reading the file conn.py.
+the library is just reading the file conn.py. Requires python 3.5 
 
 It works for me in live trading. A diligent effort will be made to squash any
 bugs reported to me. Bug reports which do not include a short easy to use python
