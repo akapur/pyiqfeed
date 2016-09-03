@@ -2379,7 +2379,7 @@ class NewsConn(FeedConn):
         else:
             xml_text = ''
             for headline in res.raw_data:
-                xml_text = xml_text + ''.join(headline[1:])
+                xml_text = xml_text + ''.join(headline[1:])+' '
             root = ET.fromstring(xml_text)
             news_headlines=[]
             for headlines in root:
@@ -2414,4 +2414,40 @@ class NewsConn(FeedConn):
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
                 raise RuntimeError(err_msg)
         return data
+
+
+    def read_news_story(self, req_id: str) -> List[str]:
+        res = self.get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            xml_text = ''
+            for line in res.raw_data:
+                xml_text = xml_text + ''.join(line[1:])+' '
+            root = ET.fromstring(xml_text)
+            news_story = []
+            for elem in root.iter('story_text'):
+                news_story.append( elem.text )
+            return news_story
+
+    def request_news_story(self, id: str=None, timeout: int=None ) -> List[str]:
+
+        if not id or id == None:
+            raise ValueError('News Story request requires a headline/story id.')
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+
+        # NSY,[ID],[XML/Text/Email],[DeliverTo],[RequestID]<CR><LF>
+
+        req_cmd = "NSY,%s,%s,%s,%s\r\n" % (id, 'x','', req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_news_story(req_id)
+        if hasattr( data, 'dtype'):
+            if data.dtype == object:
+                err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
+                raise RuntimeError(err_msg)
+        return data
+
 
