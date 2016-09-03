@@ -2260,3 +2260,158 @@ class LookupConn(FeedConn):
             raise RuntimeError(err_msg)
         else:
             return data
+
+
+
+import xml.etree.ElementTree as ET
+
+# noinspection PyUnreachableCode
+class NewsConn(FeedConn):
+    port = 9100
+
+    _databuf = namedtuple("_databuf",
+                          ['failed', 'err_msg', 'num_pts', 'raw_data'])
+
+    def __init__(self, name: str = "SymbolSearchConn",
+                 host: str = FeedConn.host, port: int = port):
+        super().__init__(name, host, port)
+        self._set_message_mappings()
+        self._req_num = 0
+        self._req_buf = {}
+        self._req_numlines = {}
+        self._req_event = {}
+        self._req_failed = {}
+        self._req_err = {}
+        self._buf_lock = threading.RLock()
+
+    def _set_message_mappings(self) -> None:
+        super()._set_message_mappings()
+        self._pf_dict['N'] = self.process_news_datum
+
+    def _send_connect_message(self):
+        # The history/lookup socket does not accept connect messages
+        pass
+
+    def process_news_datum(self, fields: Sequence[str]) -> None:
+        req_id = fields[0]
+        if 'E' == fields[1]:
+            # Error
+            self._req_failed[req_id] = True
+            err_msg = "Unknown Error"
+            if len(fields) > 2:
+                if fields[2] != "":
+                    err_msg = fields[2]
+            self._req_err[req_id] = err_msg
+        elif '!ENDMSG!' == fields[1]:
+            self._req_event[req_id].set()
+        else:
+            self._req_buf[req_id].append(fields)
+            self._req_numlines[req_id] += 1
+
+    def _get_next_req_id(self) -> str:
+        with self._buf_lock:
+            req_id = "N_%.10d" % self._req_num
+            self._req_num += 1
+            return req_id
+
+    def _cleanup_request_data(self, req_id: str) -> None:
+        with self._buf_lock:
+            del self._req_failed[req_id]
+            del self._req_err[req_id]
+            del self._req_buf[req_id]
+            del self._req_numlines[req_id]
+
+    def _setup_request_data(self, req_id: str) -> None:
+        with self._buf_lock:
+            self._req_buf[req_id] = deque()
+            self._req_numlines[req_id] = 0
+            self._req_failed[req_id] = False
+            self._req_err[req_id] = ""
+            self._req_event[req_id] = threading.Event()
+
+    def get_data_buf(self, req_id: str) -> namedtuple:
+        with self._buf_lock:
+            buf = LookupConn._databuf(
+                failed=self._req_failed[req_id],
+                err_msg=self._req_err[req_id],
+                num_pts=self._req_numlines[req_id],
+                raw_data=self._req_buf[req_id]
+            )
+        self._cleanup_request_data(req_id)
+        return buf
+
+    def read_news_config(self, req_id: str) -> List[dict]:
+        res = self.get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            xml_text = ''
+            for line in res.raw_data:
+                xml_text = xml_text + ''.join(line[1:])
+            root = ET.fromstring(xml_text)
+            news_configs=[]
+            for configs in root:
+                for c in configs:
+                    news_configs.append(c.attrib)
+            return news_configs
+
+
+    def request_news_config(self, timeout: int = None) -> List[dict]:
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+
+        # NCG,[XML/Text],[RequestID]<CR><LF>
+
+        req_cmd = "NCG,%s,%s\r\n" % ('x', req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_news_config(req_id)
+        if hasattr(data, 'dtype'):
+            if data.dtype == object:
+                err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
+                raise RuntimeError(err_msg)
+        return data
+
+    def read_news_headlines(self, req_id: str) -> List[dict]:
+        res = self.get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            xml_text = ''
+            for headline in res.raw_data:
+                xml_text = xml_text + ''.join(headline[1:])
+            root = ET.fromstring(xml_text)
+            news_headlines=[]
+            for headlines in root:
+                hdict = {'id': None, 'source': None, 'symbols': None,
+                         'text': None, 'timestamp': None }
+                for h in headlines:
+                    if( h.tag == 'symbols' and h.text ):
+                        hdict[h.tag] = list(filter(None, h.text.split(":")))
+                    else:
+                        hdict[h.tag] = h.text
+                news_headlines.append( hdict )
+            return news_headlines
+
+    def request_news_headlines(self, sources: str='', symbols: str='',
+                            limit: str='', timeout: int=None ) -> List[dict]:
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+        #
+        # NHL,[Sources],[Symbols],[XML/Text],[Limit],[Date],[RequestID]<CR><LF>
+        #
+        # Notes: Date not supported across majority of news sources (per iQFeed docs)
+        # so not implementing date. Also requesting xml only (no option) since
+        # the return is being parsed into pythonic data structures from this api
+        #
+        req_cmd = "NHL,%s,%s,%s,%s,%s,%s\r\n" % (sources, symbols, 'x', limit,'', req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_news_headlines(req_id)
+        if hasattr( data, 'dtype'):
+            if data.dtype == object:
+                err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
+                raise RuntimeError(err_msg)
+        return data
+
