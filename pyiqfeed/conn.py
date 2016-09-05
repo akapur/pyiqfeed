@@ -2394,7 +2394,7 @@ class NewsConn(FeedConn):
                 for h in headlines:
                     if h.tag == 'symbols' and h.text:
                         hdict[h.tag] = list(filter(None, h.text.split(":")))
-                    elif h.tag == 'timestamp'and h.text:
+                    elif h.tag == 'timestamp' and h.text:
                         hdict[h.tag] = read_yyyymmdd_hhmmss(h.text[:8]+' '+h.text[8:])
                     else:
                         hdict[h.tag] = h.text
