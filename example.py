@@ -1,8 +1,11 @@
+#!python3.5
+
 if __name__ == "__main__":
     from pyiqfeed.service import FeedService
     from pyiqfeed.listeners import VerboseIQFeedListener, VerboseQuoteListener, VerboseAdminListener
     from pyiqfeed.passwords import dtn_login, dtn_password, dtn_product_id
-    from pyiqfeed.conn import AdminConn, QuoteConn, HistoryConn, LookupConn, TableConn
+    from pyiqfeed.conn import AdminConn, QuoteConn, HistoryConn, LookupConn, TableConn,  NewsConn
+    from pprint import pprint
     import time
     import datetime
 
@@ -145,6 +148,75 @@ if __name__ == "__main__":
         timeout=None)
     print(e_opt)
 
+
+    #
+    # Let's test the NewsConn API and get some news:
+    #
+    news_conn = NewsConn(name="RunningInIDE")
+    news_listener = VerboseIQFeedListener("LookupListener")
+    news_conn.add_listener(news_listener)
+    news_conn.start_runner()
+
+    #
+    # News Configuration request
+    # Returns dictionary with keys:
+    #   auth_code, icon_id, name, type
+    #   'type' is the news-source-symbol
+    config = news_conn.request_news_config()
+    print("\nUSER NEWS CONFIG:")
+    pprint(config, width=60)
+    all_sources = [n['type'] for n in config]
+    print( "Subscribed news sources (from config):  ", all_sources, "\n" )
+
+    #
+    # News Headlines request:
+    # Get all the current news headlines
+    # Returns a list of dictionaries of the form:
+    #
+    #   'id' (the id used to get the full body of text)
+    #   'source' (the news source it came from)
+    #   'symbols' (any symbols relevant to the story)
+    #   'text' (the news headline text)
+    #   'timestamp': (numpy.datetime64('YEAR-MO-DY'), SECONDS_SINCE_MIDNIGHT)
+    #
+    # You can also get all headlines available for all companies with no args:
+    #
+    #    headlines = news_conn.request_news_headlines()
+    #
+    # Example: request_news_headlines (with args)
+    # Get only headlines from these sources and only about these companies:
+    #
+    srcs ="AP:DTN:CPR:CBW:RTT:MNT:MW:CPZ:CIW"
+    companies='INTC:AMZN:FB'
+    headlines = news_conn.request_news_headlines( sources=srcs, symbols=companies)
+    print("\n\nNEWS HEADLINES DATA:\n")
+    pprint(headlines, width=120)
+
+    #
+    # News Story request:
+    # Get story content body per headline id:
+    #
+    counter=0
+    for headline in headlines:
+        story = news_conn.request_news_story(id = headline['id'] )
+        print("\nNEWS STORY CONTENT:\n", story, "\n")
+        counter += 1
+        if counter == 3: break
+
+    #
+    # News Story Count Request:
+    # Get number of news stories per company within a given date range:
+    # returns a dictionary where TICKER is key and NUM_STORIES is value
+    #
+    today = datetime.date.today()
+    five_days_ago = today - datetime.timedelta(days=5)
+    companies = 'AAPL:TSLA:INTC:AMZN:FB:TWTR'
+    story_counts = news_conn.request_story_counts(symbols=companies,
+                                                  bgn_dt=five_days_ago,
+                                                  end_dt=today )
+    print( "\nNEWS STORY COUNTS:", story_counts, "\n")
+
+
     time.sleep(10)
     admin_conn.client_stats_off()
     quote_conn.unwatch("SPY")
@@ -154,4 +226,5 @@ if __name__ == "__main__":
     lookup_conn.stop_runner()
     quote_conn.stop_runner()
     hist_conn.stop_runner()
+    news_conn.stop_runner()
     admin_conn.stop_runner()

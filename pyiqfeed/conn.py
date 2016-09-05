@@ -2340,6 +2340,9 @@ class NewsConn(FeedConn):
         self._cleanup_request_data(req_id)
         return buf
 
+
+    # News Configuration request:
+
     def read_news_config(self, req_id: str) -> List[dict]:
         res = self.get_data_buf(req_id)
         if res.failed:
@@ -2372,6 +2375,9 @@ class NewsConn(FeedConn):
                 raise RuntimeError(err_msg)
         return data
 
+
+    # News Headlines requests:
+
     def read_news_headlines(self, req_id: str) -> List[dict]:
         res = self.get_data_buf(req_id)
         if res.failed:
@@ -2395,19 +2401,25 @@ class NewsConn(FeedConn):
                 news_headlines.append( hdict )
             return news_headlines
 
-    def request_news_headlines(self, sources: str='', symbols: str='',
+    def request_news_headlines(self, sources: str='', symbols: str='', date: datetime.date = None,
                             limit: str='', timeout: int=None ) -> List[dict]:
 
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        #
+
+        date_str = ''
+        if date != None:
+            date_str = date_to_yyyymmdd(date)
+
+        # Note on date:
+        # According to iqfeed docs:  *Only works for limited sources
+        # All tests using date option thus far with iqfeed, failed.
+        # It's implemented here in case of better future support from DTN
+        # But if you use the date option, don't expect to get any news back.
+
         # NHL,[Sources],[Symbols],[XML/Text],[Limit],[Date],[RequestID]<CR><LF>
-        #
-        # Notes: Date not supported across majority of news sources (per iQFeed docs)
-        # so not implementing date. Also requesting xml only (no option) since
-        # the return is being parsed into pythonic data structures from this api
-        #
-        req_cmd = "NHL,%s,%s,%s,%s,%s,%s\r\n" % (sources, symbols, 'x', limit,'', req_id)
+
+        req_cmd = "NHL,%s,%s,%s,%s,%s,%s\r\n" % (sources, symbols, 'x', limit, date_str, req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_news_headlines(req_id)
@@ -2418,7 +2430,9 @@ class NewsConn(FeedConn):
         return data
 
 
-    def read_news_story(self, req_id: str) -> List[str]:
+    # News Story request:
+
+    def read_news_story(self, req_id: str) -> str:
         res = self.get_data_buf(req_id)
         if res.failed:
             return np.array([res.err_msg], dtype='object')
@@ -2427,12 +2441,11 @@ class NewsConn(FeedConn):
             for line in res.raw_data:
                 xml_text = xml_text + ''.join(line[1:])+' '
             root = ET.fromstring(xml_text)
-            news_story = []
-            for elem in root.iter('story_text'):
-                news_story.append( elem.text )
-            return news_story
+            for story in root.iter('story_text'):
+                return story.text
 
-    def request_news_story(self, id: str=None, timeout: int=None ) -> List[str]:
+
+    def request_news_story(self, id: str=None, timeout: int=None ) -> str:
 
         if not id or id == None:
             raise ValueError('News Story request requires a headline/story id.')
@@ -2452,4 +2465,55 @@ class NewsConn(FeedConn):
                 raise RuntimeError(err_msg)
         return data
 
+
+    # News Story Count Requests:
+
+    def read_story_counts(self, req_id: str) -> dict:
+        res = self.get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            xml_text = ''
+            for line in res.raw_data:
+                xml_text = xml_text + ''.join(line[1:])+' '
+            root = ET.fromstring(xml_text)
+            story_counts={}
+            for counts in root:
+                    story_counts[ counts.attrib['Name'] ] = int(counts.attrib['StoryCount'])
+            return story_counts
+
+    def request_story_counts(self, symbols: str=None, sources: str='',
+                            bgn_dt: datetime.date = None, end_dt: datetime.date = None,
+                            timeout: int=None ) -> dict:
+
+        if not symbols or symbols == None:
+            raise ValueError('A colon separated list of symbols is required for story counts.')
+
+        date_range, bgn_str, end_str = '', '', ''
+        if bgn_dt != None:
+            bgn_str = date_to_yyyymmdd(bgn_dt)
+        if end_dt != None:
+            end_str = date_to_yyyymmdd(end_dt)
+
+        if bgn_str != '' and end_str != '':
+            date_range = bgn_str+'-'+end_str
+        elif bgn_str != '' and end_str == '':
+            date_range = bgn_str
+        elif bgn_str == '' and end_str != '':
+            date_range = end_str
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+
+        # NSC,[Symbols],[XML/Text],[Sources],[DateRange],[RequestID]<CR><LF>
+
+        req_cmd = "NSC,%s,%s,%s,%s,%s\r\n" % (symbols, 'x', sources, date_range, req_id)
+        self.send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self.read_story_counts(req_id)
+        if hasattr( data, 'dtype'):
+            if data.dtype == object:
+                err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
+                raise RuntimeError(err_msg)
+        return data
 
