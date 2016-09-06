@@ -1,7 +1,8 @@
 import os
 import time
 import socket
-
+import select
+import threading
 
 class FeedService:
 
@@ -36,27 +37,56 @@ class FeedService:
                                   win32con.SW_SHOWNORMAL)
         elif os.name == 'posix':
             import subprocess
-            iqfeed_call = "wine iqconnect.exe %s" % iqfeed_args
+            #use nohup to detach the child process:
+            iqfeed_call = "nohup wine iqconnect.exe %s" % iqfeed_args
             p = subprocess.Popen(iqfeed_call, shell=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL)
-            s = socket.socket()
-            host = "127.0.0.1"
-            port = 9400
-            timeout = 30 #seconds
+                                 stderr=subprocess.DEVNULL, preexec_fn=os.setpgrp)
+
+            #
+            # Wait until we can successfully connect to an iqfeed port
+            # (sleep had intermittent timeouts & added 5 secs of latency each time)
+            # This was more painful than expected but it seems to work nicely:
+            #
+            host = "127.0.0.1"  #localhost
+            port = 9300         #default iqfeed admin port
+            timeout = 20        #seconds
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             before = time.time()
             connecting = True
-            while connecting:
+            lock = threading.RLock()
+            ready = select.select([s], [], [s], 5)
+            while connecting or ready[2]:
+                ready = select.select([s], [], [s], 5)
                 try:
                     s.connect((host, port))
-                except:
+                    time.sleep(0.01)
+                except Exception as err:
                     connecting = True
                     if time.time() - before > timeout:
-                        raise SystemError('Timeout: Can not connect to the iqfeed port...')
+                        print("Timeout Error: Can not connect to iqfeed...")
+                        raise err
+                    else:
+                        pass
                 else:
-                    connecting = False
-                    s.recv(16384)
-                    s.close()
+                    if ready[0]:
+                        connecting = False
+                        with lock:
+                            msg = "S,CONNECT\r\n"
+                            while True:
+                                s.sendall(msg.encode(encoding='utf-8', errors='strict'))
+                                data = s.recv(16384).decode()
+                                if ",Connected," in data:
+                                    break
+                                if time.time() - before > timeout:
+                                    raise SystemError("Timeout: Can not connect to iqfeed...")
+                            msg = "S, DISCONNECT\r\n"
+                            s.sendall(msg.encode(encoding='utf-8', errors='strict'))
+                            time.sleep(0.01)
+                        s.shutdown(socket.SHUT_RDWR)
+                        s.close()
+                        break
 
     def admin_variables(self):
         return {"product": self.product,
