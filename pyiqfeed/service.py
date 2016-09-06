@@ -40,16 +40,19 @@ class FeedService:
             p = subprocess.Popen(iqfeed_call, shell=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                  stderr=subprocess.DEVNULL)
-            
             s = socket.socket()
             host = "127.0.0.1"
             port = 9400
+            timeout = 30 #seconds
+            before = time.time()
             connecting = True
             while connecting:
                 try:
                     s.connect((host, port))
                 except:
                     connecting = True
+                    if time.time() - before > timeout:
+                        raise SystemError('Timeout: Can not connect to the iqfeed port...')
                 else:
                     connecting = False
                     s.recv(16384)
