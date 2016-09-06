@@ -83,7 +83,6 @@ class FeedService:
                                     raise SystemError("Timeout: Can not connect to iqfeed...")
                             msg = "S, DISCONNECT\r\n"
                             s.sendall(msg.encode(encoding='utf-8', errors='strict'))
-                            time.sleep(0.01)
                         s.shutdown(socket.SHUT_RDWR)
                         s.close()
                         break
