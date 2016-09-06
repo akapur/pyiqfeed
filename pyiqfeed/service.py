@@ -1,5 +1,6 @@
 import os
 import time
+import socket
 
 
 class FeedService:
@@ -36,10 +37,23 @@ class FeedService:
         elif os.name == 'posix':
             import subprocess
             iqfeed_call = "wine iqconnect.exe %s" % iqfeed_args
-            subprocess.Popen(iqfeed_call, shell=True,
-                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
-            time.sleep(5)
+            p = subprocess.Popen(iqfeed_call, shell=True,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            
+            s = socket.socket()
+            host = "127.0.0.1"
+            port = 9400
+            connecting = True
+            while connecting:
+                try:
+                    s.connect((host, port))
+                except:
+                    connecting = True
+                else:
+                    connecting = False
+                    s.recv(16384)
+                    s.close()
 
     def admin_variables(self):
         return {"product": self.product,
