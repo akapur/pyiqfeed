@@ -439,6 +439,7 @@ class FeedConn:
         assert len(fields) > 20
         assert fields[0] == "S"
         assert fields[1] == "STATS"
+        #print("\n\nFIELDS:\n\n", fields,"\n\n")
         conn_stats = {"server_ip": fields[2], "server_port": int(fields[3]),
                       "max_sym": int(fields[4]), "num_sym": int(fields[5]),
                       "num_clients": int(fields[6]),
@@ -446,7 +447,8 @@ class FeedConn:
                       "num_recon": int(fields[8]),
                       "num_fail_recon": int(fields[9]),
                       "conn_tm":  time.strptime(fields[10], "%b %d %I:%M%p"),
-                      "mkt_tm": time.strptime(fields[11], "%b %d %I:%M%p"),
+                      # fixes a non-obvious error that was happening on linux:
+                      "mkt_tm": fields[11] if len(fields[11]) < 1 else time.strptime(fields[11], "%b %d %I:%M%p"),
                       "status": (fields[12] == "Connected"),
                       "feed_version": fields[13], "login": fields[14],
                       "kbs_recv": float(fields[15]),
@@ -792,7 +794,7 @@ class QuoteConn(FeedConn):
         return update
 
     def process_fundamentals(self, fields: Sequence[str]):
-        assert len(fields) > 55
+        assert len(fields) > 57
         assert fields[0] == 'F'
         msg = np.zeros(1, dtype=QuoteConn.fundamental_type)
 
