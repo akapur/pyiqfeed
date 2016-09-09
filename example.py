@@ -2,12 +2,13 @@
 
 if __name__ == "__main__":
     from pyiqfeed.service import FeedService
-    from pyiqfeed.listeners import VerboseIQFeedListener, VerboseQuoteListener, VerboseAdminListener
+    from pyiqfeed.listeners import VerboseIQFeedListener, VerboseQuoteListener, VerboseAdminListener, VerboseDerivListener
+    from pyiqfeed.listeners import SilentIQFeedListener, SilentQuoteListener, SilentAdminListener, SilentDerivListener
     from pyiqfeed.passwords import dtn_login, dtn_password, dtn_product_id
-    from pyiqfeed.conn import AdminConn, QuoteConn, HistoryConn, LookupConn, TableConn,  NewsConn
+    from pyiqfeed.conn import AdminConn, QuoteConn, HistoryConn, LookupConn, TableConn,  NewsConn, DerivConn
     from pprint import pprint
-    import time
     import datetime
+    import time
 
     svc = FeedService(product=dtn_product_id, version="Debugging",
                       login=dtn_login, password=dtn_password,
@@ -15,7 +16,8 @@ if __name__ == "__main__":
     svc.launch()
 
     admin_conn = AdminConn(name="RunningInIde")
-    admin_listener = VerboseAdminListener("AdminListener")
+    #admin_listener = VerboseAdminListener("AdminListener")
+    admin_listener = SilentAdminListener()
     admin_conn.add_listener(admin_listener)
     admin_conn.start_runner()
     admin_conn.set_admin_variables_from_dict(svc.admin_variables())
@@ -23,6 +25,7 @@ if __name__ == "__main__":
 
     quote_conn = QuoteConn(name="RunningInIDE")
     quote_listener = VerboseQuoteListener("QuoteListener")
+    #quote_listener = SilentQuoteListener()
     quote_conn.add_listener(quote_listener)
     quote_conn.start_runner()
 
@@ -32,19 +35,24 @@ if __name__ == "__main__":
     all_fields = sorted(list(QuoteConn.quote_msg_map.keys()))
     quote_conn.select_update_fieldnames(all_fields)
     quote_conn.watch("SPY")
-    time.sleep(10)
+
+    # turn on real-time news for watched symbols
+    # see if there is any news streaming about SPY
+    quote_conn.news_on()
+
+    time.sleep(5)
 
     hist_conn = HistoryConn(name="RunningInIde")
     hist_listener = VerboseIQFeedListener("HistListener")
+    #hist_listener = SilentIQFeedListener()
     hist_conn.add_listener(hist_listener)
     hist_conn.start_runner()
 
     ticks = hist_conn.request_ticks("INTC", 10)
-    print(ticks)
+    print("\nINTC ticks:\n", ticks[0].dtype.names, "\n", ticks, "\n")
 
-    ticks = hist_conn.request_ticks_for_days(
-        "IBM", 365)
-    print(ticks)
+    ticks = hist_conn.request_ticks_for_days("IBM", 365)
+    print("\nIBM ticks for days:\n", ticks[0].dtype.names, "\n", ticks, "\n")
 
     today = datetime.date.today()
     sdt = today - datetime.timedelta(days=5)
@@ -58,44 +66,44 @@ if __name__ == "__main__":
         start_tm,
         end_tm,
         max_ticks=100)
-    print(ticks)
+    print("\nINTC ticks in period:\n", ticks[0].dtype.names, "\n", ticks, "\n")
 
     bars = hist_conn.request_bars("INTC", 60, 's', 10)
-    print(bars)
+    print("\nINTC bars:\n", bars[0].dtype.names, "\n", bars, "\n")
 
     bars = hist_conn.request_bars_for_days(
         "INTC", 60, 's', 365)
-    print(bars)
+    print("\nINTC bars for days:\n", bars[0].dtype.names, "\n", bars, "\n")
 
     bars = hist_conn.request_bars_in_period(
         "INTC", 60, 's',
         start_tm,
         end_tm,
         max_bars=100)
-    print(bars)
+    print("\nINTC bars in period:\n", bars[0].dtype.names, "\n", bars, "\n")
 
     daily = hist_conn.request_daily_data("@VXH16", 10)
-    print(daily)
+    print("\nVXH16 historical daily data:\n", daily[0].dtype.names, "\n", daily, "\n")
 
     daily = hist_conn.request_daily_data_for_dates(
         "INTC", datetime.date(2016, 1, 1), datetime.date(2016, 3, 4))
-    print(daily)
+    print("\nINTC historical daily data for dates:\n", daily[0].dtype.names, "\n", daily, "\n")
 
     weekly = hist_conn.request_weekly_data("INTC", 10)
-    print(weekly)
+    print("\nINTC historical weekly data:\n", weekly[0].dtype.names, "\n", weekly, "\n")
 
     monthly = hist_conn.request_monthly_data("INTC", 12)
-    print(monthly)
+    print("\nINTC historical monthly data:\n", monthly[0].dtype.names, "\n", monthly, "\n")
 
     table_conn = TableConn(name="RunningInIDE")
     table_listener = VerboseIQFeedListener("TableListener")
     table_conn.add_listener(table_listener)
     table_conn.update_tables()
-    print(table_conn.get_markets())
-    print(table_conn.get_security_types())
-    print(table_conn.get_trade_conditions())
-    print(table_conn.get_sic_codes())
-    print(table_conn.get_naic_codes())
+    print("\nTableConn: get_markets:\n", table_conn.get_markets(), "\n")
+    print("\nTableConn: get_security_types:\n", table_conn.get_security_types(), "\n")
+    print("\nTableConn: get_trade_conditions:\n", table_conn.get_trade_conditions(), "\n")
+    print("\nTableConn: get_sic_codes:\n", table_conn.get_sic_codes(), "\n")
+    print("\nTableConn: get_naic_codes:\n", table_conn.get_naic_codes(), "\n")
 
     lookup_conn = LookupConn(name="RunningInIDE")
     lookup_listener = VerboseIQFeedListener("LookupListener")
@@ -104,21 +112,23 @@ if __name__ == "__main__":
 
     tesla_syms = lookup_conn.request_symbols_by_filter(
         search_term='TSLA', search_field='s')
-    print(tesla_syms)
+    print("\nTSLA request symbols by search filter:\n", tesla_syms, "\n")
 
     sic_symbols = lookup_conn.request_symbols_by_sic(83)
-    print(sic_symbols)
+    print("\nRequest symbols by SIC:\n", sic_symbols, "\n")
 
     naic_symbols = lookup_conn.request_symbols_by_naic(10)
-    print(naic_symbols)
-    #
+    print("\nRequest symbols by NAIC:\n", naic_symbols, "\n")
+
+
+
     f_syms = lookup_conn.request_futures_chain(
         symbol="@VX",
         month_codes="".join(LookupConn.futures_month_letters),
         years="67",
         near_months=None,
         timeout=None)
-    print(f_syms)
+    print("\n@VX Request futures chain:\n", f_syms, "\n")
 
     f_spread = lookup_conn.request_futures_spread_chain(
         symbol="@VX",
@@ -126,7 +136,7 @@ if __name__ == "__main__":
         years="67",
         near_months=None,
         timeout=None)
-    print(f_spread)
+    print("\n@VX request futures spread:\n", f_spread, "\n")
     #
     f_opt = lookup_conn.request_futures_option_chain(
         symbol="CL",
@@ -135,7 +145,7 @@ if __name__ == "__main__":
         years="67",
         near_months=None,
         timeout=None)
-    print(f_opt)
+    print("\nCL request futures option chain:\n", f_opt, "\n")
 
     e_opt = lookup_conn.request_equity_option_chain(
         symbol="INTC",
@@ -146,8 +156,67 @@ if __name__ == "__main__":
         include_binary=True,
         filt_type=0, filt_val_1=None, filt_val_2=None,
         timeout=None)
-    print(e_opt)
+    print("\nINTC request equity option chain:\n", e_opt, "\n")
 
+
+    ############
+
+    #
+    # Lets get tick data for some derivatives
+    # all symbols here is too many for an example
+    # so let's only get data for 10 of each:
+    if( len(f_syms) > 10 ):
+        f_syms = f_syms[0:10]
+    if( len(f_spread) > 10 ):
+        f_spread = f_spread[0:10]
+    if( len(e_opt['p']) > 10 ):
+        e_opt['p'] = e_opt['p'][0:10]
+    if( len(e_opt['c']) > 10 ):
+        e_opt['c'] = e_opt['c'][0:10]
+
+    derivatives = f_syms + f_spread + e_opt['p'] + e_opt['c']
+
+    #
+    # Get a bunch of derivatives tick data:
+    for deriv in derivatives:
+        try:
+            ticks = hist_conn.request_ticks(deriv, 10)
+            print("\n", deriv," DERIVATIVE TICKS!!\n", ticks[0].dtype.names, "\n", ticks, "\n")
+        except Exception as err:
+            if '!NO_DATA!' in str(err):
+                # exception was causing code to halt
+                pass
+            else:
+                print("\n",err,"\n")  # subscription error?
+                break
+
+
+    #
+    # Let's test the DerivConn class:
+    #
+    deriv_conn = DerivConn(name="RunningInIDE")
+    deriv_listener = VerboseDerivListener("DerivListener")
+    deriv_conn.add_listener(deriv_listener)
+    deriv_conn.start_runner()
+
+    # if( len(f_opt['c']) > 10 ):
+    #     f_opt['c'] = f_opt['c'][0:10]
+    # if( len(f_opt['p']) > 10 ):
+    #     f_opt['p'] = f_opt['p'][0:10]
+    #derivatives = derivatives + f_opt['p'] + f_opt['c']
+
+    for deriv in derivatives:
+        # request bars in invervals of every 60 seconds:
+        deriv_conn.request_interval_bar_watch(  symbol=deriv ,
+                                                interval=60,
+                                                bgn_prd=start_tm,
+                                                max_days_data=50,
+                                                interval_type='s' )
+
+    time.sleep(3)
+    deriv_conn.unwatch_all()
+    deriv_conn.stop_runner()
+    time.sleep(1)
 
     #
     # Let's test the NewsConn API and get some news:
@@ -159,36 +228,31 @@ if __name__ == "__main__":
 
     #
     # News Configuration request
-    # Returns dictionary with keys:
-    #   auth_code, icon_id, name, type
-    #   'type' is the news-source-symbol
+    #
     config = news_conn.request_news_config()
-    print("\nUSER NEWS CONFIG:")
+    print("\nCLIENT NEWS CONFIG:")
     pprint(config, width=60)
     all_sources = [n['type'] for n in config]
-    print( "Subscribed news sources (from config):  ", all_sources, "\n" )
+    print( "Subscribed news sources:  ", all_sources, "\n" )
 
     #
     # News Headlines request:
-    # Get all the current news headlines
-    # Returns a list of dictionaries of the form:
-    #
-    #   'id' (the id used to get the full body of text)
-    #   'source' (the news source it came from)
-    #   'symbols' (any symbols relevant to the story)
-    #   'text' (the news headline text)
-    #   'timestamp': (numpy.datetime64('YEAR-MO-DY'), SECONDS_SINCE_MIDNIGHT)
-    #
-    # You can also get all headlines available for all companies with no args:
-    #
-    #    headlines = news_conn.request_news_headlines()
-    #
-    # Example: request_news_headlines (with args)
     # Get only headlines from these sources and only about these companies:
     #
     srcs ="AP:DTN:CPR:CBW:RTT:MNT:MW:CPZ:CIW"
     companies='INTC:AMZN:FB'
     headlines = news_conn.request_news_headlines( sources=srcs, symbols=companies)
+
+    # easy to make news headlines into time sequence data frame:
+    try:
+        import pandas as pd
+        headlines_dataframe = pd.DataFrame(headlines).set_index('timestamp')
+        headlines_dataframe.sort_index(inplace=True)
+        print("\n\nNEWS HEADLINES PANDAS DATAFRAME:\n",headlines_dataframe, "\n\n" )
+    except Exception as err:
+        print(err) # maybe pandas isn't installed on your machine, no other code depends on it, so...
+
+
     print("\n\nNEWS HEADLINES DATA:\n")
     pprint(headlines, width=120)
 
@@ -217,11 +281,13 @@ if __name__ == "__main__":
     print( "\nNEWS STORY COUNTS:", story_counts, "\n")
 
 
-    time.sleep(10)
+    quote_conn.news_off()
     admin_conn.client_stats_off()
     quote_conn.unwatch("SPY")
+
     print("Unwatched")
-    time.sleep(3)
+    time.sleep(1)
+
 
     lookup_conn.stop_runner()
     quote_conn.stop_runner()
