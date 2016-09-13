@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Tuple
+from pprint import pprint
 
 
 class SilentIQFeedListener:
@@ -83,6 +84,19 @@ class SilentAdminListener(SilentIQFeedListener):
         pass
 
 
+class SilentDerivListener(SilentIQFeedListener):
+
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    def process_bars(self, bar_data: dict) -> None:
+        pass
+
+    def process_invalid_symbol(self, bad_symbol: str) -> None:
+        pass
+
+
+
 # noinspection PyMethodMayBeStatic
 class VerboseIQFeedListener:
 
@@ -118,8 +132,9 @@ class VerboseQuoteListener(VerboseIQFeedListener):
         print("%s: Invalid Symbol: %s" % (self._name, bad_symbol))
 
     def process_news(self, news_item: dict) -> None:
-        print("%s: News Item Received" % self._name)
-        print(news_item)
+        print("\n\n%s: News Item Stream Received!" % self._name)
+        pprint(news_item)
+        print("\n")
 
     def process_regional_quote(self, quote: np.array) -> None:
         print("%s: Regional Quote:" % self._name)
@@ -127,15 +142,24 @@ class VerboseQuoteListener(VerboseIQFeedListener):
 
     def process_summary(self, summary: np.array) -> None:
         print("%s: Data Summary" % self._name)
-        print(summary)
+        label = summary.dtype.names
+        for l, u in zip(label, summary[0]):
+            print("{:<33} {:<33}".format(l+": ", u))
+        print("\n")
 
     def process_update(self, update: np.array) -> None:
-        print("%s: Data Update" % self._name)
-        print(update)
+        print("\n\n%s: Data Update" % self._name)
+        label = update.dtype.names
+        for l, u in zip(label, update[0]):
+            print("{:<33} {:<33}".format(l+": ", u))
+        print("\n")
 
     def process_fundamentals(self, fund: np.array) -> None:
-        print("%s: Fundamentals Received:" % self._name)
-        print(fund)
+        print("\n%s: Fundamentals Received:" % self._name)
+        label = fund.dtype.names
+        for l, u in zip(label, fund[0]):
+            print( "{:<33} {:<33}".format(l+": ", u) )
+        print("\n")
 
     def process_auth_key(self, key: str) -> None:
         print("%s: Authorization Key Received: %s" % (self._name, key))
@@ -184,4 +208,21 @@ class VerboseAdminListener(VerboseIQFeedListener):
     def process_client_stats(self, client_stats: dict) -> None:
         print("%s: Client Stats:" % self._name)
         print(client_stats)
+
+
+# noinspection PyMethodMayBeStatic
+class VerboseDerivListener(VerboseIQFeedListener):
+
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    def process_bars(self, bar_data: dict) -> None:
+        print("%s: Process Bars" % self._name)
+        #print("\n",bar_data,"\n")
+        print("\n")
+        pprint(bar_data)
+        print("\n")
+
+    def process_invalid_symbol(self, bad_symbol: str) -> None:
+        print("%s: Invalid Symbol: %s" % (self._name, bad_symbol))
 
