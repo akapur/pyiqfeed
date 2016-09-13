@@ -94,7 +94,7 @@ def read_hhmmss(field: str) -> int:
         hour = int(field[0:2])
         minute = int(field[3:5])
         second = int(field[6:8])
-        msecs_since_midnight = 1000000 * ((3600*hour) + (60*minute) + second)
+        msecs_since_midnight = 1000 * ((3600*hour) + (60*minute) + second)
         return msecs_since_midnight
     else:
         return 0
@@ -106,7 +106,7 @@ def read_hhmmssmil(field: str) -> int:
         minute = int(field[3:5])
         second = int(field[6:8])
         msecs = int(field[9:])
-        msecs_since_midnight = (1000000 *
+        msecs_since_midnight = (1000 *
                                 ((3600*hour) + (60*minute) + second)) + msecs
         return msecs_since_midnight
     else:
