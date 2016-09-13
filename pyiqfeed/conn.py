@@ -7,21 +7,7 @@ import time
 from collections import deque, namedtuple
 from typing import Sequence, List, Callable, Tuple
 import numpy as np
-
-
-# this relative import statement was causing
-# it's own exception from pydoc's html generator:
-#
-# SystemError: Parent module '' not loaded, cannot perform relative import
-#
-try:
-    from .exceptions import NoDataError
-except SystemError as err:
-    import os, sys
-    here = os.path.dirname(os.path.realpath(__file__))
-    sys.path.append(here)
-    from exceptions import NoDataError
-    sys.path.pop()
+from .exceptions import NoDataError
 
 
 def blob_to_str(val) -> str:
@@ -107,7 +93,8 @@ def read_hhmmss(field: str) -> int:
         hour = int(field[0:2])
         minute = int(field[3:5])
         second = int(field[6:8])
-        msecs_since_midnight = 1000000 * ((3600*hour) + (60*minute) + second)
+        msecs_since_midnight = 1000000 * \
+            ((3600 * hour) + (60 * minute) + second)
         return msecs_since_midnight
     else:
         return 0
@@ -120,7 +107,7 @@ def read_hhmmssmil(field: str) -> int:
         second = int(field[6:8])
         msecs = int(field[9:])
         msecs_since_midnight = (1000000 *
-                                ((3600*hour) + (60*minute) + second)) + msecs
+                                ((3600 * hour) + (60 * minute) + second)) + msecs
         return msecs_since_midnight
     else:
         return 0
@@ -173,7 +160,8 @@ def read_yyyymmdd_hhmmss(dt_tm: str) -> Tuple[datetime.date, int]:
         hour = read_int(time_str[0:2])
         minute = read_int(time_str[2:4])
         second = read_int(time_str[4:6])
-        msecs_since_midnight = 1000000 * ((3600*hour) + (60*minute) + second)
+        msecs_since_midnight = 1000000 * \
+            ((3600 * hour) + (60 * minute) + second)
         return dt, msecs_since_midnight
     else:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
@@ -211,10 +199,10 @@ def str_or_blank(val) -> str:
 def ms_since_midnight_to_time(ms: int) -> datetime.time:
     assert ms >= 0
     assert ms <= 86400000000
-    secs_since_midnight = np.floor(ms/1000000.0)
-    hour = np.floor(secs_since_midnight/3600)
-    minute = np.floor((secs_since_midnight-(hour*3600))/60)
-    second = secs_since_midnight - (hour*3600) - (minute*60)
+    secs_since_midnight = np.floor(ms / 1000000.0)
+    hour = np.floor(secs_since_midnight / 3600)
+    minute = np.floor((secs_since_midnight - (hour * 3600)) / 60)
+    second = secs_since_midnight - (hour * 3600) - (minute * 60)
     return datetime.time(hour=int(hour), minute=int(minute), second=int(second))
 
 
@@ -343,7 +331,8 @@ class FeedConn:
 
         self._sm_dict["SERVER DISCONNECTED"] = self.process_server_disconnected
         self._sm_dict["SERVER CONNECTED"] = self.process_server_connected
-        self._sm_dict["SERVER RECONNECT FAILED"] = self.process_reconnect_failed
+        self._sm_dict[
+            "SERVER RECONNECT FAILED"] = self.process_reconnect_failed
         self._sm_dict["CURRENT PROTOCOL"] = self.process_current_protocol
         self._sm_dict["STATS"] = self.process_conn_stats
 
@@ -375,7 +364,7 @@ class FeedConn:
             message = self.next_message()
             while "" != message:
                 fields = message.split(',')
-                #print(fields)
+                # print(fields)
                 handle_func = self.processing_function(fields)
                 handle_func(fields)
                 message = self.next_message()
@@ -461,8 +450,9 @@ class FeedConn:
                       "num_recon": int(fields[8]),
                       "num_fail_recon": int(fields[9]),
                       "conn_tm":  time.strptime(fields[10], "%b %d %I:%M%p"),
-                      # fixes a non-obvious error that was happening on linux:
-                      "mkt_tm": fields[11] if len(fields[11]) < 1 else time.strptime(fields[11], "%b %d %I:%M%p"),
+                      "mkt_tm": time.strptime(fields[11], "%b %d %I:%M%p"),
+                      # fixes a non-obvious error that was intermittently happening during connection:
+                      #"mkt_tm": fields[11] if len(fields[11]) < 1 else time.strptime(fields[11], "%b %d %I:%M%p"),
                       "status": (fields[12] == "Connected"),
                       "feed_version": fields[13], "login": fields[14],
                       "kbs_recv": float(fields[15]),
@@ -593,7 +583,7 @@ class QuoteConn(FeedConn):
                         ('NAICS', 'u8'),
                         ('Exchange Root', 'S128'),
                         ('Option Premium Multiplier', 'f8'),
-                        ('Option Multiple Deliverable', 'u8') ]
+                        ('Option Multiple Deliverable', 'u8')]
 
     # noinspection PyPep8
     quote_msg_map = {'Symbol': ('Symbol', 'S128', lambda x: x),
@@ -957,7 +947,8 @@ class QuoteConn(FeedConn):
             lambda x: x, num_update_fields))
         for field_num, field in enumerate(fields):
             if field not in QuoteConn.quote_msg_map:
-                raise RuntimeError("%s not in QuoteConn.dtn_update_map" % field)
+                raise RuntimeError(
+                    "%s not in QuoteConn.dtn_update_map" % field)
             new_update_fields[field_num] = field
             dtn_update_tup = QuoteConn.quote_msg_map[field]
             new_update_names[field_num] = dtn_update_tup[0]
@@ -1504,8 +1495,8 @@ class HistoryConn(FeedConn):
         ef_str = time_to_hhmmss(end_flt)
         mb_str = blob_to_str(max_bars)
         req_cmd = "HID,%s,%d,%d,%s,%s,%s,%d,%s,,%s\r\n" % (
-                    ticker, interval_len, days, mb_str, bf_str, ef_str, ascend,
-                    req_id, interval_type)
+            ticker, interval_len, days, mb_str, bf_str, ef_str, ascend,
+            req_id, interval_type)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_bars(req_id)
@@ -1542,8 +1533,8 @@ class HistoryConn(FeedConn):
         mb_str = blob_to_str(max_bars)
 
         req_cmd = "HIT,%s,%d,%s,%s,%s,%s,%s,%d,%s,,%s\r\n" % (
-                   ticker, interval_len, bp_str, ep_str, mb_str,
-                   bf_str, ef_str, ascend, req_id, interval_type)
+            ticker, interval_len, bp_str, ep_str, mb_str,
+            bf_str, ef_str, ascend, req_id, interval_type)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self.read_bars(req_id)
@@ -1714,7 +1705,7 @@ class TableConn(FeedConn):
         pass
 
     def processing_function(self, fields: Sequence[str]) -> Callable[
-                                                        [Sequence[str]], None]:
+            [Sequence[str]], None]:
         if fields[0].isdigit():
             return self.process_table_entry
         elif fields[0] == '!ENDMSG!':
@@ -1778,7 +1769,8 @@ class TableConn(FeedConn):
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
-                    self.markets[line_num]['mkt_id'] = read_uint64(data_list[0])
+                    self.markets[line_num][
+                        'mkt_id'] = read_uint64(data_list[0])
                     self.markets[line_num]['short_name'] = data_list[1]
                     self.markets[line_num]['name'] = data_list[2]
                     self.markets[line_num]['group_id'] =\
@@ -1800,7 +1792,8 @@ class TableConn(FeedConn):
             self._current_event.wait(120)
             if self._current_event.is_set():
                 num_pts = len(self._current_deque)
-                self.security_types = np.empty(num_pts, TableConn.security_type)
+                self.security_types = np.empty(
+                    num_pts, TableConn.security_type)
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
@@ -2169,7 +2162,7 @@ class LookupConn(FeedConn):
             if len(call_symbols) > 0:
                 if call_symbols[-1] == "":
                     call_symbols = call_symbols[:-1]
-            put_symbols = symbols[cp_delim+1:]
+            put_symbols = symbols[cp_delim + 1:]
             if len(put_symbols) > 0:
                 if put_symbols[-1] == "":
                     put_symbols = put_symbols[:-1]
@@ -2279,10 +2272,11 @@ class LookupConn(FeedConn):
             return data
 
 
-
 import xml.etree.ElementTree as ET
 
 # noinspection PyUnreachableCode
+
+
 class NewsConn(FeedConn):
     """
 
@@ -2385,7 +2379,6 @@ class NewsConn(FeedConn):
         self._cleanup_request_data(req_id)
         return buf
 
-
     def _read_news_config(self, req_id: str) -> List[dict]:
         """
         Internal Function: Util function used internally to convert news configs into dictionaries
@@ -2398,12 +2391,11 @@ class NewsConn(FeedConn):
             for line in res.raw_data:
                 xml_text = xml_text + ''.join(line[1:])
             root = ET.fromstring(xml_text)
-            news_configs=[]
+            news_configs = []
             for configs in root:
                 for c in configs:
                     news_configs.append(c.attrib)
             return news_configs
-
 
     def request_news_config(self, timeout: int = None) -> List[dict]:
         """
@@ -2435,7 +2427,6 @@ class NewsConn(FeedConn):
                 raise RuntimeError(err_msg)
         return data
 
-
     def _read_news_headlines(self, req_id: str) -> List[dict]:
         """
         Internal Function: Util function used internally to convert news data into dictionaries
@@ -2446,26 +2437,26 @@ class NewsConn(FeedConn):
         else:
             xml_text = ''
             for headline in res.raw_data:
-                xml_text = xml_text + ''.join(headline[1:])+' '
+                xml_text = xml_text + ''.join(headline[1:]) + ' '
             root = ET.fromstring(xml_text)
-            news_headlines=[]
+            news_headlines = []
             for headlines in root:
                 hdict = {'id': None, 'source': None, 'symbols': None,
-                         'text': None, 'timestamp': None }
+                         'text': None, 'timestamp': None}
                 for h in headlines:
                     if h.tag == 'symbols' and h.text:
                         hdict[h.tag] = list(filter(None, h.text.split(":")))
                     elif h.tag == 'timestamp' and h.text:
-                        hdict[h.tag] = read_yyyymmdd_hhmmss(h.text[:8]+' '+h.text[8:])
+                        hdict[h.tag] = read_yyyymmdd_hhmmss(
+                            h.text[:8] + ' ' + h.text[8:])
                     else:
                         hdict[h.tag] = h.text
-                news_headlines.append( hdict )
+                news_headlines.append(hdict)
             return news_headlines
 
-
     def request_news_headlines(self, sources: str='', symbols: str='',
-                                date: datetime.date = None, limit: str='',
-                                timeout: int=None ) -> List[dict]:
+                               date: datetime.date = None, limit: str='',
+                               timeout: int=None) -> List[dict]:
         """
 
         News Headlines request:
@@ -2514,16 +2505,16 @@ class NewsConn(FeedConn):
 
         # NHL,[Sources],[Symbols],[XML/Text],[Limit],[Date],[RequestID]<CR><LF>
 
-        req_cmd = "NHL,%s,%s,%s,%s,%s,%s\r\n" % (sources, symbols, 'x', limit, date_str, req_id)
+        req_cmd = "NHL,%s,%s,%s,%s,%s,%s\r\n" % (
+            sources, symbols, 'x', limit, date_str, req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_news_headlines(req_id)
-        if hasattr( data, 'dtype'):
+        if hasattr(data, 'dtype'):
             if data.dtype == object:
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
                 raise RuntimeError(err_msg)
         return data
-
 
     def _read_news_story(self, req_id: str) -> str:
         """
@@ -2535,13 +2526,12 @@ class NewsConn(FeedConn):
         else:
             xml_text = ''
             for line in res.raw_data:
-                xml_text = xml_text + ''.join(line[1:])+' '
+                xml_text = xml_text + ''.join(line[1:]) + ' '
             root = ET.fromstring(xml_text)
             for story in root.iter('story_text'):
                 return story.text
 
-
-    def request_news_story(self, id: str=None, timeout: int=None ) -> str:
+    def request_news_story(self, id: str=None, timeout: int=None) -> str:
         """
 
         News Story request:
@@ -2554,24 +2544,24 @@ class NewsConn(FeedConn):
             http://www.iqfeed.net/dev/api/docs/NewsLookupviaTCPIP.cfm
 
         """
-        if not id or id == None:
-            raise ValueError('News Story request requires a headline/story id.')
+        if not id:
+            raise ValueError(
+                'News Story request requires a headline/story id.')
 
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
 
         # NSY,[ID],[XML/Text/Email],[DeliverTo],[RequestID]<CR><LF>
 
-        req_cmd = "NSY,%s,%s,%s,%s\r\n" % (id, 'x','', req_id)
+        req_cmd = "NSY,%s,%s,%s,%s\r\n" % (id, 'x', '', req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_news_story(req_id)
-        if hasattr( data, 'dtype'):
+        if hasattr(data, 'dtype'):
             if data.dtype == object:
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
                 raise RuntimeError(err_msg)
         return data
-
 
     def _read_story_counts(self, req_id: str) -> dict:
         """
@@ -2583,16 +2573,17 @@ class NewsConn(FeedConn):
         else:
             xml_text = ''
             for line in res.raw_data:
-                xml_text = xml_text + ''.join(line[1:])+' '
+                xml_text = xml_text + ''.join(line[1:]) + ' '
             root = ET.fromstring(xml_text)
-            story_counts={}
+            story_counts = {}
             for counts in root:
-                    story_counts[ counts.attrib['Name'] ] = int(counts.attrib['StoryCount'])
+                story_counts[counts.attrib['Name']] = int(
+                    counts.attrib['StoryCount'])
             return story_counts
 
     def request_story_counts(self, symbols: str=None, sources: str='',
-                            bgn_dt: datetime.date = None, end_dt: datetime.date = None,
-                            timeout: int=None ) -> dict:
+                             bgn_dt: datetime.date = None, end_dt: datetime.date = None,
+                             timeout: int=None) -> dict:
         """
 
         News Story Count Request:
@@ -2621,8 +2612,9 @@ class NewsConn(FeedConn):
             http://www.iqfeed.net/dev/api/docs/NewsLookupviaTCPIP.cfm
 
         """
-        if not symbols or symbols == None:
-            raise ValueError('A colon separated list of symbols is required for story counts.')
+        if not symbols:
+            raise ValueError(
+                'A colon separated list of symbols is required for story counts.')
 
         date_range, bgn_str, end_str = '', '', ''
         if bgn_dt != None:
@@ -2631,7 +2623,7 @@ class NewsConn(FeedConn):
             end_str = date_to_yyyymmdd(end_dt)
 
         if bgn_str != '' and end_str != '':
-            date_range = bgn_str+'-'+end_str
+            date_range = bgn_str + '-' + end_str
         elif bgn_str != '' and end_str == '':
             date_range = bgn_str
         elif bgn_str == '' and end_str != '':
@@ -2642,300 +2634,39 @@ class NewsConn(FeedConn):
 
         # NSC,[Symbols],[XML/Text],[Sources],[DateRange],[RequestID]<CR><LF>
 
-        req_cmd = "NSC,%s,%s,%s,%s,%s\r\n" % (symbols, 'x', sources, date_range, req_id)
+        req_cmd = "NSC,%s,%s,%s,%s,%s\r\n" % (
+            symbols, 'x', sources, date_range, req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_story_counts(req_id)
-        if hasattr( data, 'dtype'):
+        if hasattr(data, 'dtype'):
             if data.dtype == object:
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
                 raise RuntimeError(err_msg)
         return data
 
 
-
 # noinspection PyUnreachableCode
-class DerivativeInfo():
+class BarConn(FeedConn):
     """
 
-    Utility class for extracting useful information from symbology of
-    derivative chain symbols such as options and futures symbols.
-    For example: Extracting expiration and strike price from OPRA OSI
-    codes and other symbol formats.
-
-    For more info, see relevant sections of:
-        http://www.iqfeed.net/symbolguide/index.cfm
-
-    """
-    futures_type_codes = "PC"
-    futures_month_codes = 'FGHJKMNQUVXZ'
-    options_month_codes = "ABCDEFGHIJKLMNOPQRSTUVWX"
-
-    deriv_type = ["futures", "futures_option",
-                  "futures_spread", "option"]
-
-    def derivative_type(self, deriv_symbol: str='' ) -> (str,list):
-        """
-
-         Takes any derivative symbol and determines it's type.
-         Returns one of the following:
-            "futures", "futures_option", "futures_spread", "option"
-
-        """
-        parts =  list(filter(None, re.split('(\d+)', deriv_symbol )))
-        if len(parts) == 2 \
-                and parts[0][-1] in self.futures_month_codes:
-            return (self.deriv_type[0], parts) #futures
-
-        if parts[0][-1] in self.futures_month_codes \
-                and len(parts) >= 3 and len(parts[1]) < 4 \
-                and parts[2] in self.futures_type_codes:
-            return (self.deriv_type[1], parts) #futures option
-
-        if len(parts) == 4 and parts[2][0] == "-" \
-                and parts[0][-1] in self.futures_month_codes:
-            return (self.deriv_type[2], parts) #futures spread
-
-        if len(parts) >= 4 and len(parts[1]) == 4 \
-                and parts[2] in self.options_month_codes :
-            return (self.deriv_type[3], parts) #option
-
-
-    def third_friday(self, year, month) ->datetime.date:
-        """
-
-        Note -- this func is strictly for estimation purposes only to
-        quickly sort long chains before sending query requests, since
-        3rd Friday is the standard expiration for futures, etc, but
-        unfortunately isn't bulletproof as some expiration dates
-        are on days other than this (holidays etc) but this should be
-        correct the vast majority of times and fine for sorting purposes
-        Be sure to double check true exp date from a request query later
-
-        """
-        import calendar
-        c = calendar.Calendar(firstweekday=calendar.SUNDAY)
-        monthcal = c.monthdatescalendar(year, month)
-        third_friday = [day for week in monthcal for day in week if \
-                        day.weekday() == calendar.FRIDAY and \
-                        day.month == month][2]
-        return third_friday
-
-
-    def options_info(self, symbol: str='') -> dict:
-        """
-
-        Util to decipher OPRA OSI option chain symbology like INTC1614V36 into:
-           Underlier (Ticker), Type (Put/Call), Expiration (datetime), Strike price
-
-        For more info, see:
-        http://www.iqfeed.net/symbolguide/index.cfm?symbolguide=guide&guide=options&type=stock
-
-        Example: options_info(symbol='INTC1607V29.5')
-
-        Returns:
-            {'deriv_type': 'option',
-             'expiration_date': numpy.datetime64('2016-10-07'),
-             'strike_price': 29.5,
-             'type': 'put',
-             'underlier': 'INTC'}
-
-        """
-        o= self.options_month_codes
-        options_month_map = {  o[0]:1,    o[1]:2,   o[2]:3,
-                               o[3]:4,    o[4]:5,   o[5]:6,
-                               o[6]:7,    o[7]:8,   o[8]:9,
-                               o[9]:10,   o[10]:11, o[11]:12,
-                               o[12]:1,   o[13]:2,  o[14]:3,
-                               o[15]:4,   o[16]:5,  o[17]:6,
-                               o[18]:7,   o[19]:8,  o[20]:9,
-                               o[21]:10,  o[22]:11, o[23]:12 }
-
-        opra_osi_parts = re.split('(\d+)',symbol)
-        option_dict={}
-        option_dict['underlier'] = opra_osi_parts[0]
-
-        this_year = str( datetime.date.today().year )
-        yr = this_year[0:2]+opra_osi_parts[1][0:2]
-        day = opra_osi_parts[1][2:]
-        mth = options_month_map[ opra_osi_parts[2] ]
-        option_dict['expiration_date'] = np.datetime64( datetime.date(year=int(yr),
-                                                                month=int(mth),
-                                                                day=int(day) ) )
-        if o.index(opra_osi_parts[2]) > 11:
-            option_dict['type'] = 'put'
-        else:
-            option_dict['type'] = 'call'
-        option_dict['strike_price'] = float(''.join(opra_osi_parts[3:]))
-        return option_dict
-
-
-    def futures_info(self, symbol: str='' ) -> dict:
-        """
-
-        Util to extract futures info from
-        standard futures symbology format
-
-        For more info, see:
-        http://www.iqfeed.net/symbolguide/index.cfm?symbolguide=guide&guide=commod&type=cme
-
-        Example: futures_info(symbol='@VXZ16')
-
-        Returns:
-            {'deriv_type': 'futures',
-             'expiration_date': numpy.datetime64('2016-12-16'),
-             'underlier': '@VX'}
-
-        Note: Expiration date is an estimate using third friday rule
-              If you need true expiration send a level 1 request query
-
-        """
-        f_parts = re.split('(\d+)', symbol)
-        f_dict = {}
-        f_dict['underlier'] = f_parts[0][:-1]
-        this_year = str( datetime.date.today().year )
-        year = int(this_year[0:2]+f_parts[1][0:2])
-        month = int(self.futures_month_codes.index(f_parts[0][-1])) + 1
-        third_friday = self.third_friday(year, month)
-        f_dict['expiration_date'] = np.datetime64( third_friday )
-        return f_dict
-
-
-    def futures_options_info(self, symbol: str='' ):
-        """
-
-         Util to extract futures options information
-
-        For more info, see:
-        http://www.iqfeed.net/symbolguide/index.cfm?symbolguide=guide&guide=commod&type=cme
-
-        Example: futures_options_info(symbol="CLV16P10050")
-
-        Returns:
-            {'deriv_type': 'futures_option',
-             'expiration_date': numpy.datetime64('2016-10-21'),
-             'strike_price': 100.5,
-             'type': 'put',
-             'underlier': 'CL'}
-
-        Note: Expiration date is an estimate using third friday rule
-              If you need true expiration send a level 1 request query
-
-        """
-        f_parts =  list(filter(None, re.split('(\d+)', symbol )))
-        fo_dict = {}
-        fo_dict['underlier'] = f_parts[0][:-1]
-        fo_dict['type'] = 'put' if f_parts[2] == "P" else 'call'
-        month = int(self.futures_month_codes.index(f_parts[0][-1])) + 1
-        this_year = str(datetime.date.today().year)
-        year = int(this_year[0:2] + f_parts[1][0:2])
-        third_friday = self.third_friday(year, month)
-        fo_dict['expiration_date'] = np.datetime64(third_friday)
-        fo_dict['strike_price'] = float(f_parts[-1][:-2]+"."+f_parts[-1][-2:])
-        return fo_dict
-
-
-    def futures_spread_info(self, symbol: str='' ):
-        """
-
-        Extract info from future spread symbology
-
-        Example:  futures_spread_info(symbol="@VXU16-@VXH17")
-
-        Returns:
-            {'deriv_type': 'futures_spread',
-             'expiration_date': numpy.datetime64('2016-09-16'),
-             'expiration_sprd': numpy.datetime64('2017-03-17'),
-             'underlier': '@VX'}
-
-        """
-        parts = symbol.split("-")
-        first_finfo  = self.futures_info(parts[0])
-        second_finfo = self.futures_info(parts[1])
-        spread = {'expiration_sprd': second_finfo['expiration_date']}
-        spread.update( first_finfo )
-        return spread
-
-
-    def decipher_derivative(self, symbol: str='' ):
-        """
-
-         Takes any derivative symbol and determines it's type
-         Then extracts and returns relevant information for
-         that type.  Works on symbols for options, futures,
-         future spreads, and future options.
-
-        Examples:
-            dvinfo = DerivativeInfo()
-            Option:
-                dvinfo.decipher_derivative(symbol="INTC1607V29.5")
-            Futures Option:
-                dvinfo.decipher_derivative(symbol="CLV16P10050")
-            Futures:
-                dvinfo.decipher_derivative(symbol="@VXZ16")
-            Futures Spread:
-                dvinfo.decipher_derivative(symbol="@VXU16-@VXH17")
-
-        Returns: dictionary (some fields not present on some deriv_types)
-
-           {'deriv_type': Contains one of the following:
-                    'option', 'futures', 'futures_spread', or 'futures_option'
-
-             'expiration_date': numpy.datetime64
-
-             'expiration_sprd': numpy.datetime64 (only on futures spread)
-
-             'strike_price': float  (only on options)
-
-             'type': Contains one of the following (only on options):
-                    'put' or 'call'
-
-             'underlier': TICKER }
-
-        """
-
-        dtype, parts = self.derivative_type( symbol )
-        info = {}
-
-        if dtype == self.deriv_type[0]: # futures
-            info = self.futures_info( symbol=symbol )
-
-        if dtype == self.deriv_type[1]: #futures_option
-            info = self.futures_options_info( symbol=symbol )
-
-        if dtype == self.deriv_type[2]: #futures_spread
-            info = self.futures_spread_info( symbol=symbol )
-
-        if dtype == self.deriv_type[3]: #option
-            info = self.options_info(symbol=symbol)
-
-        info['deriv_type'] = dtype
-        return info
-
-import re
-
-# noinspection PyUnreachableCode
-class DerivConn(FeedConn):
-    """
-
-    iqfeed Connection class for watching and streaming derivative
-    interval bars (options, futures, etc). Returns real-time
-    streaming bars, historical bars, and update bars.
+    iqfeed Connection class for watching and streaming
+    interval bars (for options, futures, equities, etc).
+    Returns real-time streaming bars, historical bars, and update bars.
 
     Accompanying listener class for custom processing of the data
     is also included in pyiqfeed.listeners module
 
     Example listener:
-        VerboseDerivListener
+        VerboseBarListener
 
     For more info, see:
         http://www.iqfeed.net/dev/api/docs/Derivatives_Overview.cfm
 
     """
     port = 9400
-    dvinfo = DerivativeInfo()
 
-    def __init__(self, name: str = "DerivConn", host: str = FeedConn.host,
+    def __init__(self, name: str = "BarConn", host: str = FeedConn.host,
                  port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
@@ -2946,13 +2677,13 @@ class DerivConn(FeedConn):
         self._pf_dict['BH'] = self._process_bars
         self._pf_dict['BU'] = self._process_bars
         self._pf_dict['BC'] = self._process_bars
-        self._pf_dict['B']  = self._process_bars
+        self._pf_dict['B'] = self._process_bars
 
     def _process_invalid_symbol(self, fields: Sequence[str]) -> None:
         assert len(fields) > 1
         assert fields[0] == 'n'
         bad_sym = fields[1]
-        print( fields )
+        print(fields)
         for listener in self._listeners:
             listener.process_invalid_symbol(bad_sym)
 
@@ -2981,9 +2712,12 @@ class DerivConn(FeedConn):
         assert len(fields) == 11
         assert fields[0][0] == "B"
         type_of = fields[0]
-        if fields[0] == "BH": type_of = "history"
-        if fields[0] == "BU": type_of = "update"
-        if fields[0] == "BC": type_of = "stream"
+        if fields[0] == "BH":
+            type_of = "history"
+        if fields[0] == "BU":
+            type_of = "update"
+        if fields[0] == "BC":
+            type_of = "stream"
 
         symbology = fields[1]
         date_str = fields[2].replace("-", "").replace(":", "")
@@ -2994,7 +2728,7 @@ class DerivConn(FeedConn):
         last = float(fields[6])
         volume_cumulative = int(fields[7])
         volume_interval = int(fields[8])
-        num_trades = int(fields[9])
+        num_trades = float(fields[9])
         bars_dict = {"response_type": type_of,
                      "symbol":      symbology,
                      "date_time":   date_time,
@@ -3004,28 +2738,23 @@ class DerivConn(FeedConn):
                      "price_last":  last,
                      "volume_cumulative": volume_cumulative,
                      "volume_interval": volume_interval,
-                     "tick_trades": num_trades }
-
-        oc = self.dvinfo.decipher_derivative( symbol=symbology )
-
-        bars_dict.update( oc )
+                     "tick_trades": num_trades}
 
         for listener in self._listeners:
-             listener.process_bars(bars_dict)
+            listener.process_bars(bars_dict)
 
-
-    def request_interval_bar_watch( self, symbol: str='',
-                                    interval: int=None,
-                                    bgn_prd: datetime.datetime=None,
-                                    max_days_data: int=None,
-                                    max_data_points: int=None,
-                                    bgn_flt: datetime.time=None,
-                                    end_flt: datetime.time=None,
-                                    req_id: str='', interval_type: str='',
-                                    update: int=None) -> None:
+    def request_interval_bar_watch(self, symbol: str='',
+                                   interval: int=None,
+                                   bgn_prd: datetime.datetime=None,
+                                   max_days_data: int=None,
+                                   max_data_points: int=None,
+                                   bgn_flt: datetime.time=None,
+                                   end_flt: datetime.time=None,
+                                   req_id: str='', interval_type: str='',
+                                   update: int=None) -> None:
         """
 
-        Function for streaming a derivative's interval bars via TCP/IP
+        Function for streaming interval bars via TCP/IP
 
         Sends a watch request in the following format:
 
@@ -3033,7 +2762,7 @@ class DerivConn(FeedConn):
               [MaxDatapoints],[BeginFilterTime],[EndFilterTime],[RequestID],
               [Interval Type],[Reserved],[UpdateInterval]
 
-        Derivative bars will begin streaming in after a call to:
+        Bars will begin streaming in after a call to:
             request_interval_bar_watch()
 
         Data is sent into this a processng function, parsed into a key-value
@@ -3043,7 +2772,7 @@ class DerivConn(FeedConn):
         For the access point to process the streaming data, see example code and
         the class in listeners:
 
-            VerboseDerivListener
+            VerboseBarListener
 
         For more info, see:
             http://www.iqfeed.net/dev/api/docs/Derivatives_StreamingIntervalBars_TCPIP.cfm
@@ -3057,17 +2786,15 @@ class DerivConn(FeedConn):
         update_str = blob_to_str(update)
 
         bar_cmd = "BW,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\r\n" % (symbol, interval,
-                                                             bp_str, mxdays_str,
-                                                             mxdpts_str, bf_str,
-                                                             ef_str, req_id,
-                                                             interval_type,'',
-                                                             update_str)
-        self.send_cmd(bar_cmd )
-
+                                                               bp_str, mxdays_str,
+                                                               mxdpts_str, bf_str,
+                                                               ef_str, req_id,
+                                                               interval_type, '',
+                                                               update_str)
+        self.send_cmd(bar_cmd)
 
     def request_watches(self) -> None:
         self.send_cmd("S,REQUEST WATCHES\r\n")
 
     def unwatch_all(self) -> None:
         self.send_cmd("S,UNWATCH ALL")
-

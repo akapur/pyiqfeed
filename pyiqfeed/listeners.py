@@ -84,7 +84,7 @@ class SilentAdminListener(SilentIQFeedListener):
         pass
 
 
-class SilentDerivListener(SilentIQFeedListener):
+class SilentBarListener(SilentIQFeedListener):
 
     def __init__(self, name: str):
         super().__init__(name)
@@ -211,7 +211,7 @@ class VerboseAdminListener(VerboseIQFeedListener):
 
 
 # noinspection PyMethodMayBeStatic
-class VerboseDerivListener(VerboseIQFeedListener):
+class VerboseBarListener(VerboseIQFeedListener):
 
     def __init__(self, name: str):
         super().__init__(name)

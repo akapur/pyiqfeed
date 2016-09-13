@@ -2,10 +2,10 @@
 
 if __name__ == "__main__":
     from pyiqfeed.service import FeedService
-    from pyiqfeed.listeners import VerboseIQFeedListener, VerboseQuoteListener, VerboseAdminListener, VerboseDerivListener
-    from pyiqfeed.listeners import SilentIQFeedListener, SilentQuoteListener, SilentAdminListener, SilentDerivListener
+    from pyiqfeed.listeners import VerboseIQFeedListener, VerboseQuoteListener, VerboseAdminListener, VerboseBarListener
+    from pyiqfeed.listeners import SilentIQFeedListener, SilentQuoteListener, SilentAdminListener, SilentBarListener
     from pyiqfeed.passwords import dtn_login, dtn_password, dtn_product_id
-    from pyiqfeed.conn import AdminConn, QuoteConn, HistoryConn, LookupConn, TableConn,  NewsConn, DerivConn
+    from pyiqfeed.conn import AdminConn, QuoteConn, HistoryConn, LookupConn, TableConn,  NewsConn, BarConn
     from pprint import pprint
     import datetime
     import time
@@ -192,12 +192,12 @@ if __name__ == "__main__":
 
 
     #
-    # Let's test the DerivConn class:
+    # Let's test the BarConn class:
     #
-    deriv_conn = DerivConn(name="RunningInIDE")
-    deriv_listener = VerboseDerivListener("DerivListener")
-    deriv_conn.add_listener(deriv_listener)
-    deriv_conn.start_runner()
+    bar_conn = BarConn(name="RunningInIDE")
+    bar_listener = VerboseBarListener("BarListener")
+    bar_conn.add_listener(bar_listener)
+    bar_conn.start_runner()
 
     # if( len(f_opt['c']) > 10 ):
     #     f_opt['c'] = f_opt['c'][0:10]
@@ -207,15 +207,15 @@ if __name__ == "__main__":
 
     for deriv in derivatives:
         # request bars in invervals of every 60 seconds:
-        deriv_conn.request_interval_bar_watch(  symbol=deriv ,
+        bar_conn.request_interval_bar_watch(  symbol=deriv ,
                                                 interval=60,
                                                 bgn_prd=start_tm,
                                                 max_days_data=50,
                                                 interval_type='s' )
 
     time.sleep(3)
-    deriv_conn.unwatch_all()
-    deriv_conn.stop_runner()
+    bar_conn.unwatch_all()
+    bar_conn.stop_runner()
     time.sleep(1)
 
     #
