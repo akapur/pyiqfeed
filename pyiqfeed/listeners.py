@@ -16,7 +16,6 @@ class SilentIQFeedListener:
     def process_conn_stats(self, stats: dict) -> None:
         pass
 
-    # noinspection PyUnresolvedReferences
     def process_timestamp(self, time_val: Tuple[np.datetime64, int]) -> None:
         pass
 
@@ -83,7 +82,6 @@ class SilentAdminListener(SilentIQFeedListener):
         pass
 
 
-# noinspection PyMethodMayBeStatic
 class VerboseIQFeedListener:
 
     def __init__(self, name: str):
@@ -102,13 +100,11 @@ class VerboseIQFeedListener:
         print("%s: Connection Stats:" % self._name)
         print(stats)
 
-    # noinspection PyUnresolvedReferences
     def process_timestamp(self, time_val: Tuple[np.datetime64, int]):
         print("%s: Timestamp:" % self._name)
         print(time_val)
 
 
-# noinspection PyMethodMayBeStatic
 class VerboseQuoteListener(VerboseIQFeedListener):
 
     def __init__(self, name: str):
@@ -154,7 +150,6 @@ class VerboseQuoteListener(VerboseIQFeedListener):
         print("%s: IP Addresses Used: %s" % (self._name, ip))
 
 
-# noinspection PyMethodMayBeStatic
 class VerboseAdminListener(VerboseIQFeedListener):
 
     def __init__(self, name: str):

@@ -1,5 +1,7 @@
-import os
+import sys
+import platform
 import time
+import subprocess
 
 
 class FeedService:
@@ -26,15 +28,30 @@ class FeedService:
             iqfeed_args = "%s -autoconnect" % iqfeed_args
         if self.savelogininfo:
             iqfeed_args = "%s -savelogininfo" % iqfeed_args
-        if os.name == 'nt':
+
+        if sys.platform == 'win32':
             # noinspection PyUnresolvedReferences
             import win32api
             # noinspection PyUnresolvedReferences
             import win32con
             win32api.ShellExecute(0, "open", "IQConnect.exe", iqfeed_args, "",
                                   win32con.SW_SHOWNORMAL)
-        elif os.name == 'posix':
-            import subprocess
+
+        elif sys.platform == 'darwin':
+            iqfeed_call = "nohup wine iqconnect.exe %s" % iqfeed_args
+            p = subprocess.Popen(iqfeed_call, shell=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, preexec_fn=os.setpgrp)
+
+
+
+        elif sys.platform == 'linux':
+            iqfeed_call = "nohup wine iqconnect.exe %s" % iqfeed_args
+            p = subprocess.Popen(iqfeed_call, shell=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, preexec_fn=os.setpgrp)
+
+
             iqfeed_call = "wine iqconnect.exe %s" % iqfeed_args
             subprocess.Popen(iqfeed_call, shell=True,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

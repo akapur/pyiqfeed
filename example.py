@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 if __name__ == "__main__":
     from pyiqfeed.service import FeedService
     from pyiqfeed.listeners import VerboseIQFeedListener, VerboseQuoteListener, VerboseAdminListener

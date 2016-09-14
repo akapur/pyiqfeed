@@ -113,7 +113,6 @@ def read_hhmmssmil(field: str) -> int:
         return 0
 
 
-# noinspection PyUnresolvedReferences
 def read_mmddccyy(field: str) -> np.datetime64:
     if field != "":
         month = int(field[0:2])
@@ -125,7 +124,6 @@ def read_mmddccyy(field: str) -> np.datetime64:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
 
 
-# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 def read_ccyymmdd(field: str) -> np.datetime64:
     if field != "":
         year = int(field[0:4])
@@ -137,7 +135,6 @@ def read_ccyymmdd(field: str) -> np.datetime64:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
 
 
-# noinspection PyUnresolvedReferences
 def read_dtn_timestamp(dt_tm: str) -> Tuple[np.datetime64, int]:
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
@@ -148,7 +145,6 @@ def read_dtn_timestamp(dt_tm: str) -> Tuple[np.datetime64, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-# noinspection PyUnresolvedReferences
 def read_yyyymmdd_hhmmss(dt_tm: str) -> Tuple[datetime.date, int]:
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
@@ -166,7 +162,6 @@ def read_yyyymmdd_hhmmss(dt_tm: str) -> Tuple[datetime.date, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-# noinspection PyUnresolvedReferences
 def read_posix_ts_mil(dt_tm_str: str) -> Tuple[np.datetime64, int]:
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
@@ -177,7 +172,6 @@ def read_posix_ts_mil(dt_tm_str: str) -> Tuple[np.datetime64, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-# noinspection PyUnresolvedReferences
 def read_posix_ts(dt_tm_str: str) -> Tuple[np.datetime64, int]:
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
@@ -212,7 +206,6 @@ def time_to_hhmmss(tm: datetime.time) -> str:
         return ""
 
 
-# noinspection PyUnresolvedReferences
 def datetime64_to_date(dt64: np.datetime64) -> datetime.date:
     return dt64.astype(datetime.date)
 
@@ -224,7 +217,6 @@ def date_to_yyyymmdd(dt: datetime.date) -> str:
         return ""
 
 
-# noinspection PyUnresolvedReferences
 def date_ms_to_datetime(dt64: np.datetime64, tm_int: int) -> datetime.datetime:
     dt = datetime64_to_date(dt64)
     tm = ms_since_midnight_to_time(tm_int)
@@ -234,7 +226,6 @@ def date_ms_to_datetime(dt64: np.datetime64, tm_int: int) -> datetime.datetime:
 
 def datetime_to_yyyymmdd_hhmmss(dt_tm: datetime.datetime) -> str:
     if dt_tm is not None:
-        # noinspection PyPep8
         return "%.4d%.2d%.2d %.2d%.2d%.2d" % (dt_tm.year, dt_tm.month, dt_tm.day,
                                               dt_tm.hour, dt_tm.minute,
                                               dt_tm.second)
@@ -373,7 +364,6 @@ class FeedConn:
         else:
             return self.process_unregistered_message
 
-    # noinspection PyMethodMayBeStatic
     def process_unregistered_message(self, fields: Sequence[str]) -> None:
         raise RuntimeError("Unexpected message received: %s", ",".join(fields))
 
@@ -393,13 +383,11 @@ class FeedConn:
         else:
             return self.process_unregistered_system_message
 
-    # noinspection PyMethodMayBeStatic
     def process_unregistered_system_message(self,
                                             fields: Sequence[str]) -> None:
         raise RuntimeError("Unexpected system message received: %s", ",".join(
             fields))
 
-    # noinspection PyMethodMayBeStatic
     def process_current_protocol(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == "S"
@@ -579,7 +567,6 @@ class QuoteConn(FeedConn):
                         ('Option Premium Multiplier', 'f8'),
                         ('Option Multiple Deliverable', 'u8') ]
 
-    # noinspection PyPep8
     quote_msg_map = {'Symbol': ('Symbol', 'S128', lambda x: x),
                      '7 Day Yield': ('7 Day Yield', 'f8', read_float64),
                      'Ask': ('Ask', 'f8', read_float64),
@@ -896,7 +883,6 @@ class QuoteConn(FeedConn):
         for listener in self._listeners:
             listener.process_ip_addresses_used(ip)
 
-    # noinspection PyMethodMayBeStatic
     def process_fundamental_fieldnames(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == 'S'
@@ -910,7 +896,6 @@ class QuoteConn(FeedConn):
                 raise RuntimeError(
                     "%s not found in FUNDAMENTAL FIELDNAMES message" % field)
 
-    # noinspection PyMethodMayBeStatic
     def process_update_fieldnames(self, fields: Sequence[str]) -> None:
         assert len(fields) > 2
         assert fields[0] == 'S'
@@ -1540,7 +1525,6 @@ class HistoryConn(FeedConn):
         else:
             return data
 
-    # noinspection PyUnresolvedReferences
     def read_days(self, req_id: str) -> np.array:
         res = self.get_data_buf(req_id)
         if res.failed:
@@ -2084,7 +2068,6 @@ class LookupConn(FeedConn):
         assert month_codes is not None or near_months is not None
 
         if month_codes is not None:
-            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in LookupConn.futures_month_letters
 
@@ -2117,7 +2100,6 @@ class LookupConn(FeedConn):
         assert month_codes is not None or near_months is not None
 
         if month_codes is not None:
-            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in LookupConn.futures_month_letters
 
@@ -2177,7 +2159,6 @@ class LookupConn(FeedConn):
         assert month_codes is not None or near_months is not None
 
         if month_codes is not None:
-            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in LookupConn.futures_month_letters
 
@@ -2232,7 +2213,6 @@ class LookupConn(FeedConn):
             elif opt_type == 'cp' or opt_type == 'pc':
                 valid_month_codes = (LookupConn.equity_call_month_letters +
                                      LookupConn.equity_put_month_letters)
-            # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in valid_month_codes
         assert filt_type in (0, 1, 2)
