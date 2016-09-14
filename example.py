@@ -262,7 +262,7 @@ if __name__ == "__main__":
     #
     counter=0
     for headline in headlines:
-        story = news_conn.request_news_story(id = headline['id'] )
+        story = news_conn.request_news_story(story_id= headline['id'] )
         print("\nNEWS STORY CONTENT:\n", story, "\n")
         counter += 1
         if counter == 3: break

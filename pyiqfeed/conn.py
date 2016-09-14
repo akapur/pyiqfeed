@@ -6,6 +6,7 @@ import threading
 import time
 from collections import deque, namedtuple
 from typing import Sequence, List, Callable, Tuple
+import xml.etree.ElementTree as ET
 import numpy as np
 from .exceptions import NoDataError
 
@@ -18,7 +19,7 @@ def blob_to_str(val) -> str:
 
 
 def read_market_open(field: str) -> bool:
-    bool(int(field)) if field != "" else False
+    return bool(int(field)) if field != "" else False
 
 
 def read_short_restricted(field: str) -> bool:
@@ -451,8 +452,10 @@ class FeedConn:
                       "num_fail_recon": int(fields[9]),
                       "conn_tm":  time.strptime(fields[10], "%b %d %I:%M%p"),
                       "mkt_tm": time.strptime(fields[11], "%b %d %I:%M%p"),
-                      # fixes a non-obvious error that was intermittently happening during connection:
-                      #"mkt_tm": fields[11] if len(fields[11]) < 1 else time.strptime(fields[11], "%b %d %I:%M%p"),
+                      # fixes a non-obvious error that was intermittently
+                      # happening during connection:
+                      #"mkt_tm": fields[11] if len(fields[11]) < 1 else
+                      #              time.strptime(fields[11], "%b %d %I:%M%p"),
                       "status": (fields[12] == "Connected"),
                       "feed_version": fields[13], "login": fields[14],
                       "kbs_recv": float(fields[15]),
@@ -594,9 +597,9 @@ class QuoteConn(FeedConn):
                          ('Ask Market Center', 'u1', read_uint8),
                      'Ask Size': ('Ask Size', 'u8', read_uint64),
                      'Ask Time': ('Ask Time', 'u8', read_hhmmssmil),
+                     # TODO: Parse:
                      'Available Regions':
                          ('Available Regions', 'S128', lambda x: x),
-                         # TODO: Parse
                      'Average Maturity':
                          ('Average Maturity', 'f8', read_float64),
                      'Bid': ('Bid', 'f8', read_float64),
@@ -617,7 +620,7 @@ class QuoteConn(FeedConn):
                          ('Decimal Precision', 'u1', read_uint8),
                      'Delay': ('Delay', 'u1', read_uint8),
                      'Exchange ID': ('Exchange ID', 'u1', read_hex),
-                     'Extended Trade': ('Extended Price',  'f8', read_float64),
+                     'Extended Trade': ('Extended Price', 'f8', read_float64),
                      'Extended Trade Date':
                          ('Extended Trade Date', 'M8[D]', read_mmddccyy),
                      'Extended Trade Market Center':
@@ -630,9 +633,9 @@ class QuoteConn(FeedConn):
                          ('Extended Trading Change', 'f8', read_float64),
                      'Extended Trading Difference':
                          ('Extended Trading Difference', 'f8', read_float64),
+                     # TODO: Parse:
                      'Financial Status Indicator':
                          ('Financial Status Indicator', 'S1', lambda x: x),
-                         # TODO: Parse
                      'Fraction Display Code':
                          ('Fraction Display Code', 'u1', read_uint8),
                      'High': ('High', 'f8', read_float64),
@@ -646,13 +649,14 @@ class QuoteConn(FeedConn):
                      'Market Capitalization':
                          ('Market Capitalization', 'f8', read_float64),
                      'Market Open': ('Market Open', 'b1', read_market_open),
+                     # TODO: Parse:
                      'Message Contents':
-                         ('Message Contents', 'S9', lambda x: x),  # TODO: Parse
+                         ('Message Contents', 'S9', lambda x: x),
                      'Most Recent Trade':
                          ('Most Recent Trade', 'f8', read_float64),
+                     # TODO: Parse:
                      'Most Recent Trade Conditions':
                          ('Most Recent Trade Conditions', 'S16', lambda x: x),
-                         # TODO: Parse
                      'Most Recent Trade Date':
                          ('Most Recent Trade Date', 'M8[D]', read_mmddccyy),
                      'Most Recent Trade Market Center':
@@ -688,8 +692,8 @@ class QuoteConn(FeedConn):
                      'Volatility': ('Volatility', 'f8', read_float64),
                      'VWAP': ('VWAP', 'f8', read_float64)}
 
-    def __init__(self, name: str = "QuoteConn", host: str = FeedConn.host,
-                 port: int = port):
+    def __init__(self, name: str="QuoteConn", host: str=FeedConn.host,
+                 port: int=port):
         super().__init__(name, host, port)
         self._current_update_fields = []
         self._update_names = []
@@ -821,10 +825,12 @@ class QuoteConn(FeedConn):
         msg['Five-year Growth Percentage'] = read_float64(fields[21])
         msg['Fiscal Year End'] = read_uint8(fields[22])
         msg['Company Name'] = fields[24]
-        msg['Root Option Symbol'] = fields[25]    # TODO:Parse
+        # TODO:Parse:
+        msg['Root Option Symbol'] = fields[25]
         msg['Percent Held By Institutions'] = read_float64(fields[26])
         msg['Beta'] = read_float64(fields[27])
-        msg['Leaps'] = fields[28]  # TODO: Parse
+        # TODO: Parse:
+        msg['Leaps'] = fields[28]
         msg['Current Assets'] = read_float64(fields[29])
         msg['Current Liabilities'] = read_float64(fields[30])
         msg['Balance Sheet Date'] = read_mmddccyy(fields[31])
@@ -1031,8 +1037,8 @@ class AdminConn(FeedConn):
     port = 9300
     host = "127.0.0.1"
 
-    def __init__(self, name: str ="AdminConn",
-                 host: str = host, port: int = port):
+    def __init__(self, name: str="AdminConn",
+                 host: str=host, port: int=port):
         super().__init__(name, host, port)
         self._set_message_mappings()
 
@@ -1177,7 +1183,7 @@ class AdminConn(FeedConn):
                             product: str,
                             login: str,
                             password: str,
-                            autoconnect: bool = True) -> None:
+                            autoconnect: bool=True) -> None:
         self.register_client_app(product)
         self.set_login(login)
         self.set_password(password)
@@ -1229,8 +1235,8 @@ class HistoryConn(FeedConn):
     _databuf = namedtuple("_databuf",
                           ['failed', 'err_msg', 'num_pts', 'raw_data'])
 
-    def __init__(self, name: str = "HistoryConn",
-                 host: str = FeedConn.host, port: int = port):
+    def __init__(self, name: str="HistoryConn",
+                 host: str=FeedConn.host, port: int=port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._req_num = 0
@@ -1480,8 +1486,8 @@ class HistoryConn(FeedConn):
 
     def request_bars_for_days(self, ticker: str, interval_len: int,
                               interval_type: str, days: int,
-                              bgn_flt: datetime.time = None,
-                              end_flt: datetime.time = None,
+                              bgn_flt: datetime.time=None,
+                              end_flt: datetime.time=None,
                               ascend: bool=False,
                               max_bars: int=None,
                               timeout: int=None) -> np.array:
@@ -1684,8 +1690,8 @@ class TableConn(FeedConn):
     naic_type = np.dtype([('naic', 'u8'),
                           ('name', 'S128')])
 
-    def __init__(self, name: str = "TableConn", host: str = FeedConn.host,
-                 port: int = port):
+    def __init__(self, name: str="TableConn", host: str=FeedConn.host,
+                 port: int=port):
         super().__init__(name, host, port)
 
         self.markets = None
@@ -1910,8 +1916,8 @@ class LookupConn(FeedConn):
     _databuf = namedtuple("_databuf",
                           ['failed', 'err_msg', 'num_pts', 'raw_data'])
 
-    def __init__(self, name: str = "SymbolSearchConn",
-                 host: str = FeedConn.host, port: int = port):
+    def __init__(self, name: str="SymbolSearchConn",
+                 host: str=FeedConn.host, port: int=port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._req_num = 0
@@ -2083,10 +2089,10 @@ class LookupConn(FeedConn):
             return chain
 
     def request_futures_chain(self, symbol: str,
-                              month_codes: str = None,
-                              years: str = None,
-                              near_months: int = None,
-                              timeout: int = None) -> List[str]:
+                              month_codes: str=None,
+                              years: str=None,
+                              near_months: int=None,
+                              timeout: int=None) -> List[str]:
         # CFU,[Symbol],[Month Codes],[Years],[Near Months],[RequestID]<CR><LF>
         assert (symbol is not None) and (symbol != '')
 
@@ -2116,10 +2122,10 @@ class LookupConn(FeedConn):
             return data
 
     def request_futures_spread_chain(self, symbol: str,
-                                     month_codes: str = None,
-                                     years: str = None,
-                                     near_months: int = None,
-                                     timeout: int = None) -> List[str]:
+                                     month_codes: str=None,
+                                     years: str=None,
+                                     near_months: int=None,
+                                     timeout: int=None) -> List[str]:
         # CFS,[Symbol],[Month Codes],[Years],[Near Months],[RequestID]<CR><LF>
         assert (symbol is not None) and (symbol != '')
 
@@ -2169,11 +2175,11 @@ class LookupConn(FeedConn):
             return {"c": call_symbols, "p": put_symbols}
 
     def request_futures_option_chain(self, symbol: str,
-                                     opt_type: str = 'pc',
-                                     month_codes: str = None,
-                                     years: str = None,
-                                     near_months: int = None,
-                                     timeout: int = None) -> dict:
+                                     opt_type: str='pc',
+                                     month_codes: str=None,
+                                     years: str=None,
+                                     near_months: int=None,
+                                     timeout: int=None) -> dict:
         # CFO,[Symbol],[Puts/Calls],[Month Codes],[Years],[Near Months],
         # [RequestID]<CR><LF>
         assert (symbol is not None) and (symbol != '')
@@ -2212,14 +2218,14 @@ class LookupConn(FeedConn):
             return data
 
     def request_equity_option_chain(self, symbol: str,
-                                    opt_type: str = 'pc',
-                                    month_codes: str = None,
-                                    near_months: int = None,
-                                    include_binary: bool = True,
-                                    filt_type: int = 0,
-                                    filt_val_1: float = None,
-                                    filt_val_2: float = None,
-                                    timeout: int = None) -> dict:
+                                    opt_type: str='pc',
+                                    month_codes: str=None,
+                                    near_months: int=None,
+                                    include_binary: bool=True,
+                                    filt_type: int=0,
+                                    filt_val_1: float=None,
+                                    filt_val_2: float=None,
+                                    timeout: int=None) -> dict:
         # CEO,[Symbol],[Puts/Calls],[Month Codes],[Near Months],
         # [BinaryOptions],[Filter Type],[Filter Value One],[Filter Value Two],
         # [RequestID]<CR><LF>
@@ -2272,11 +2278,7 @@ class LookupConn(FeedConn):
             return data
 
 
-import xml.etree.ElementTree as ET
-
 # noinspection PyUnreachableCode
-
-
 class NewsConn(FeedConn):
     """
 
@@ -2296,8 +2298,8 @@ class NewsConn(FeedConn):
     _databuf = namedtuple("_databuf",
                           ['failed', 'err_msg', 'num_pts', 'raw_data'])
 
-    def __init__(self, name: str = "NewsConn",
-                 host: str = FeedConn.host, port: int = port):
+    def __init__(self, name: str="NewsConn",
+                 host: str=FeedConn.host, port: int=port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._req_num = 0
@@ -2397,7 +2399,7 @@ class NewsConn(FeedConn):
                     news_configs.append(c.attrib)
             return news_configs
 
-    def request_news_config(self, timeout: int = None) -> List[dict]:
+    def request_news_config(self, timeout: int=None) -> List[dict]:
         """
 
         News Configuration request
@@ -2455,7 +2457,7 @@ class NewsConn(FeedConn):
             return news_headlines
 
     def request_news_headlines(self, sources: str='', symbols: str='',
-                               date: datetime.date = None, limit: str='',
+                               date: datetime.date=None, limit: str='',
                                timeout: int=None) -> List[dict]:
         """
 
@@ -2531,7 +2533,7 @@ class NewsConn(FeedConn):
             for story in root.iter('story_text'):
                 return story.text
 
-    def request_news_story(self, id: str=None, timeout: int=None) -> str:
+    def request_news_story(self, story_id: str=None, timeout: int=None) -> str:
         """
 
         News Story request:
@@ -2544,7 +2546,7 @@ class NewsConn(FeedConn):
             http://www.iqfeed.net/dev/api/docs/NewsLookupviaTCPIP.cfm
 
         """
-        if not id:
+        if not story_id:
             raise ValueError(
                 'News Story request requires a headline/story id.')
 
@@ -2553,7 +2555,7 @@ class NewsConn(FeedConn):
 
         # NSY,[ID],[XML/Text/Email],[DeliverTo],[RequestID]<CR><LF>
 
-        req_cmd = "NSY,%s,%s,%s,%s\r\n" % (id, 'x', '', req_id)
+        req_cmd = "NSY,%s,%s,%s,%s\r\n" % (story_id, 'x', '', req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_news_story(req_id)
@@ -2582,7 +2584,7 @@ class NewsConn(FeedConn):
             return story_counts
 
     def request_story_counts(self, symbols: str=None, sources: str='',
-                             bgn_dt: datetime.date = None, end_dt: datetime.date = None,
+                             bgn_dt: datetime.date=None, end_dt: datetime.date=None,
                              timeout: int=None) -> dict:
         """
 
@@ -2666,8 +2668,8 @@ class BarConn(FeedConn):
     """
     port = 9400
 
-    def __init__(self, name: str = "BarConn", host: str = FeedConn.host,
-                 port: int = port):
+    def __init__(self, name: str="BarConn", host: str=FeedConn.host,
+                 port: int=port):
         super().__init__(name, host, port)
         self._set_message_mappings()
 
@@ -2692,9 +2694,11 @@ class BarConn(FeedConn):
         Internal function:
 
         Data is sent through this function as follows:
-        [RequestID] - RequestID provided during initial bar watch; this field is OPTIONAL and will NOT appear if the request ID was left blank.
+        [RequestID] - RequestID provided during initial bar watch; this field
+                    is OPTIONAL and will NOT appear if the request ID was left blank.
 
-        0 [Type] - Update type; 'U' - updated interval bar; 'H' - complete interval bar from history; 'C' - complete interval bar from stream
+        0 [Type] - Update type; 'U' - updated interval bar; 'H' - complete interval bar
+                    from history; 'C' - complete interval bar from stream
         1 [Symbol] - Symbol for the interval bar
         2 [DateTime] - Date/time of the interval in CCYY-MM-DD HH:MM:SS format
         3 [Open] - First price in the interval
