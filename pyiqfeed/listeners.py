@@ -218,10 +218,12 @@ class VerboseBarListener(VerboseIQFeedListener):
 
     def process_bars(self, bar_data: dict) -> None:
         print("%s: Process Bars" % self._name)
-        #print("\n",bar_data,"\n")
-        print("\n")
-        pprint(bar_data)
-        print("\n")
+
+        print( "\n", bar_data[0].dtype.names , "\n", bar_data, "\n" )
+
+        #print("\n")
+        #pprint(bar_data)
+        #print("\n")
 
     def process_invalid_symbol(self, bad_symbol: str) -> None:
         print("%s: Invalid Symbol: %s" % (self._name, bad_symbol))

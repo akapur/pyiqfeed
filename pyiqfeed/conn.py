@@ -1439,6 +1439,7 @@ class HistoryConn(FeedConn):
         if res.failed:
             return np.array([res.err_msg], dtype='object')
         else:
+
             data = np.empty(res.num_pts, HistoryConn.bar_type)
             line_num = 0
             while res.raw_data and (line_num < res.num_pts):
@@ -2668,6 +2669,18 @@ class BarConn(FeedConn):
     """
     port = 9400
 
+    bar_data = np.dtype([('date', 'M8[D]'),
+                         ('time', 'u8'),
+                         ('open_p', 'f8'),
+                         ('high_p', 'f8'),
+                         ('low_p', 'f8'),
+                         ('close_p', 'f8'),
+                         ('tot_vlm', 'u8'),
+                         ('prd_vlm', 'u8'),
+                         ('num_trds', 'u8'),
+                         ('stream_type', 'S16'),
+                         ('symbol', 'S16') ])
+
     def __init__(self, name: str="BarConn", host: str=FeedConn.host,
                  port: int=port):
         super().__init__(name, host, port)
@@ -2723,29 +2736,26 @@ class BarConn(FeedConn):
         if fields[0] == "BC":
             type_of = "stream"
 
-        symbology = fields[1]
+        data = np.empty(len(fields), BarConn.bar_data)
         date_str = fields[2].replace("-", "").replace(":", "")
-        date_time = read_yyyymmdd_hhmmss(date_str)
-        open_val = float(fields[3])
-        high = float(fields[4])
-        low = float(fields[5])
-        last = float(fields[6])
-        volume_cumulative = int(fields[7])
-        volume_interval = int(fields[8])
-        num_trades = float(fields[9])
-        bars_dict = {"response_type": type_of,
-                     "symbol":      symbology,
-                     "date_time":   date_time,
-                     "price_open":  open_val,
-                     "price_high":  high,
-                     "price_low":   low,
-                     "price_last":  last,
-                     "volume_cumulative": volume_cumulative,
-                     "volume_interval": volume_interval,
-                     "tick_trades": num_trades}
+        dte, tme = read_yyyymmdd_hhmmss(date_str)
+
+        data['date'] = dte
+        data['time'] = np.int64(tme)
+        data['open_p'] = np.float64(fields[3])
+        data['high_p'] = np.float64(fields[4])
+        data['low_p'] = np.float64(fields[5])
+        data['close_p'] = np.float64(fields[6])
+        data['tot_vlm'] = np.int64(fields[7])
+        data['prd_vlm'] = np.int64(fields[8])
+        # this is not base ten data, iqfeed:
+        data['num_trds'] = np.int64(float(fields[9]))
+        # extra labels we'll want since this streaming:
+        data['stream_type'] = type_of
+        data['symbol'] = fields[1]
 
         for listener in self._listeners:
-            listener.process_bars(bars_dict)
+                    listener.process_bars(data)
 
     def request_interval_bar_watch(self, symbol: str='',
                                    interval: int=None,
