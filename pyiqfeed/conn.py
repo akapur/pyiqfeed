@@ -443,7 +443,6 @@ class FeedConn:
         assert len(fields) > 20
         assert fields[0] == "S"
         assert fields[1] == "STATS"
-        #print("\n\nFIELDS:\n\n", fields,"\n\n")
         conn_stats = {"server_ip": fields[2], "server_port": int(fields[3]),
                       "max_sym": int(fields[4]), "num_sym": int(fields[5]),
                       "num_clients": int(fields[6]),
@@ -451,11 +450,15 @@ class FeedConn:
                       "num_recon": int(fields[8]),
                       "num_fail_recon": int(fields[9]),
                       "conn_tm":  time.strptime(fields[10], "%b %d %I:%M%p"),
-                      "mkt_tm": time.strptime(fields[11], "%b %d %I:%M%p"),
-                      # fixes a non-obvious error that was intermittently
-                      # happening during connection:
-                      #"mkt_tm": fields[11] if len(fields[11]) < 1 else
-                      #              time.strptime(fields[11], "%b %d %I:%M%p"),
+                      #"mkt_tm": time.strptime(fields[11], "%b %d %I:%M%p"),
+
+                      # fixes a non-obvious exception that was intermittently
+                      # happening during connection - this still keeps happening.
+                      # Almost certainly due to a DTN issue, happens on first request:
+                      "mkt_tm": time.struct_time((0,0,0,0,0,0,0,0,0))
+                                if len(fields[11]) < 1 else
+                                    time.strptime(fields[11], "%b %d %I:%M%p"),
+
                       "status": (fields[12] == "Connected"),
                       "feed_version": fields[13], "login": fields[14],
                       "kbs_recv": float(fields[15]),
@@ -2382,7 +2385,7 @@ class NewsConn(FeedConn):
         self._cleanup_request_data(req_id)
         return buf
 
-    def _read_news_config(self, req_id: str) -> List[dict]:
+    def _read_news_config_xml(self, req_id: str) -> List[dict]:
         """
         Internal Function: Util function used internally to convert news configs into dictionaries
         """
@@ -2400,7 +2403,26 @@ class NewsConn(FeedConn):
                     news_configs.append(c.attrib)
             return news_configs
 
-    def request_news_config(self, timeout: int=None) -> List[dict]:
+    def _read_news_config_csv(self, req_id: str) -> List[dict]:
+        """
+        Internal Function: Util function used internally to convert news configs into dictionaries
+        """
+        res = self._get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            configs = []
+            res.raw_data.popleft()
+            for c in res.raw_data:
+                configs.append( {'auth_code': c[4],
+                                'icon_id': c[5],
+                                'name': c[3],
+                                'type': c[2],
+                                'level': c[1] } )
+
+            return configs
+
+    def request_news_config(self, timeout: int=None, req_format: str='x') -> List[dict]:
         """
 
         News Configuration request
@@ -2420,19 +2442,24 @@ class NewsConn(FeedConn):
 
         # NCG,[XML/Text],[RequestID]<CR><LF>
 
-        req_cmd = "NCG,%s,%s\r\n" % ('x', req_id)
+        req_cmd = "NCG,%s,%s\r\n" % (req_format, req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
-        data = self._read_news_config(req_id)
+        data = None
+        if req_format == 't':
+            data = self._read_news_config_csv(req_id)
+        elif req_format == 'x':
+            data = self._read_news_config_xml(req_id)
+
         if hasattr(data, 'dtype'):
             if data.dtype == object:
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
                 raise RuntimeError(err_msg)
         return data
 
-    def _read_news_headlines(self, req_id: str) -> List[dict]:
+    def _read_news_headlines_xml(self, req_id: str) -> List[dict]:
         """
-        Internal Function: Util function used internally to convert news data into dictionaries
+        Internal Function: Util function used internally to convert xml news data into dictionaries
         """
         res = self._get_data_buf(req_id)
         if res.failed:
@@ -2457,9 +2484,27 @@ class NewsConn(FeedConn):
                 news_headlines.append(hdict)
             return news_headlines
 
+    def _read_news_headlines_csv(self, req_id: str) -> List[dict]:
+        """
+        Internal Function: Util function used internally to convert csv news data into dictionaries
+        """
+        res = self._get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            headlines = []
+            for h in res.raw_data:
+                headlines.append( {'id': h[3],
+                                'source': h[2],
+                                'symbols': list(filter(None, h[4].split(":"))),
+                                'text': h[6],
+                                'timestamp': read_yyyymmdd_hhmmss(
+                                             h[5][:8] + ' ' + h[5][8:]) } )
+            return headlines
+
     def request_news_headlines(self, sources: str='', symbols: str='',
                                date: datetime.date=None, limit: str='',
-                               timeout: int=None) -> List[dict]:
+                               timeout: int=None, req_format: str='x') -> List[dict]:
         """
 
         News Headlines request:
@@ -2503,25 +2548,33 @@ class NewsConn(FeedConn):
         self._setup_request_data(req_id)
 
         date_str = ''
-        if date != None:
+        if date is not None:
             date_str = date_to_yyyymmdd(date)
 
         # NHL,[Sources],[Symbols],[XML/Text],[Limit],[Date],[RequestID]<CR><LF>
 
         req_cmd = "NHL,%s,%s,%s,%s,%s,%s\r\n" % (
-            sources, symbols, 'x', limit, date_str, req_id)
+            sources, symbols, req_format, limit, date_str, req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
-        data = self._read_news_headlines(req_id)
+
+        data = None
+        if req_format == 't':
+            data = self._read_news_headlines_csv(req_id)
+        elif req_format == 'x':
+            data = self._read_news_headlines_xml(req_id)
+
         if hasattr(data, 'dtype'):
             if data.dtype == object:
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
                 raise RuntimeError(err_msg)
         return data
 
-    def _read_news_story(self, req_id: str) -> str:
+
+
+    def _read_news_story_xml(self, req_id: str) -> str:
         """
-        Internal Function: Util function used internally to convert news stories into strings
+        Internal Function: Util function used internally to convert xml news stories into strings
         """
         res = self._get_data_buf(req_id)
         if res.failed:
@@ -2534,7 +2587,24 @@ class NewsConn(FeedConn):
             for story in root.iter('story_text'):
                 return story.text
 
-    def request_news_story(self, story_id: str=None, timeout: int=None) -> str:
+    def _read_news_story_csv(self, req_id: str) -> str:
+        """
+        Internal Function: Util function used internally to convert csv news stories into strings
+        """
+        res = self._get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            story = ''
+            res.raw_data.pop()
+            res.raw_data.popleft()
+            for story_parts in res.raw_data:
+                story += ''.join(story_parts[1:]) + ' '
+            return story
+
+
+    def request_news_story(self, story_id: str=None,
+                        timeout: int=None, req_format: str='x') -> str:
         """
 
         News Story request:
@@ -2556,19 +2626,26 @@ class NewsConn(FeedConn):
 
         # NSY,[ID],[XML/Text/Email],[DeliverTo],[RequestID]<CR><LF>
 
-        req_cmd = "NSY,%s,%s,%s,%s\r\n" % (story_id, 'x', '', req_id)
+        req_cmd = "NSY,%s,%s,%s,%s\r\n" % (story_id, req_format, '', req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
-        data = self._read_news_story(req_id)
+        data = None
+        if req_format == 't':
+            data = self._read_news_story_csv(req_id)
+        elif req_format == 'x':
+            data = self._read_news_story_xml(req_id)
+
         if hasattr(data, 'dtype'):
             if data.dtype == object:
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
                 raise RuntimeError(err_msg)
         return data
 
-    def _read_story_counts(self, req_id: str) -> dict:
+
+
+    def _read_story_counts_xml(self, req_id: str) -> dict:
         """
-        Internal Function: Util function used internally to convert story counts into dictionaries
+        Internal Function: Util function used internally to convert xml story counts into dictionaries
         """
         res = self._get_data_buf(req_id)
         if res.failed:
@@ -2584,9 +2661,25 @@ class NewsConn(FeedConn):
                     counts.attrib['StoryCount'])
             return story_counts
 
+    def _read_story_counts_csv(self, req_id: str) -> dict:
+        """
+        Internal Function: Util function used internally to convert csv story counts into dictionaries
+        """
+        res = self._get_data_buf(req_id)
+        if res.failed:
+            return np.array([res.err_msg], dtype='object')
+        else:
+            story_counts, count_data = {}, []
+            for elem in res.raw_data[0][1:]:
+                count_data += elem.split(":")
+            for c in range(1, len(count_data), 2):
+                story_counts[ count_data[c] ] = count_data[c+1]
+
+            return story_counts
+
     def request_story_counts(self, symbols: str=None, sources: str='',
                              bgn_dt: datetime.date=None, end_dt: datetime.date=None,
-                             timeout: int=None) -> dict:
+                             timeout: int=None, req_format: str='x') -> dict:
         """
 
         News Story Count Request:
@@ -2620,9 +2713,9 @@ class NewsConn(FeedConn):
                 'A colon separated list of symbols is required for story counts.')
 
         date_range, bgn_str, end_str = '', '', ''
-        if bgn_dt != None:
+        if bgn_dt is not None:
             bgn_str = date_to_yyyymmdd(bgn_dt)
-        if end_dt != None:
+        if end_dt is not None:
             end_str = date_to_yyyymmdd(end_dt)
 
         if bgn_str != '' and end_str != '':
@@ -2638,10 +2731,15 @@ class NewsConn(FeedConn):
         # NSC,[Symbols],[XML/Text],[Sources],[DateRange],[RequestID]<CR><LF>
 
         req_cmd = "NSC,%s,%s,%s,%s,%s\r\n" % (
-            symbols, 'x', sources, date_range, req_id)
+            symbols, req_format, sources, date_range, req_id)
         self.send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
-        data = self._read_story_counts(req_id)
+        data = None
+        if req_format == 't':
+            data = self._read_story_counts_csv(req_id)
+        elif req_format == 'x':
+            data = self._read_story_counts_xml(req_id)
+
         if hasattr(data, 'dtype'):
             if data.dtype == object:
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[0]))
