@@ -108,3 +108,4 @@ crashlytics-build.properties
 
 # Logins and Passwords used for testing
 pyiqfeed/passwords.py
+passwords.py

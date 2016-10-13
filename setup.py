@@ -8,4 +8,4 @@ setup(name='pyiqfeed',
       author_email='akapur@amvirk.com',
       license='GPL v2',
       packages=['pyiqfeed'],
-      zip_safe=False)
+      zip_safe=False, install_requires=['numpy'])
