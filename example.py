@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+# coding=utf-8
 
 import time
 import datetime
@@ -116,7 +117,6 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
     tick_data = hist_conn.request_ticks(ticker=ticker, max_ticks=max_ticks)
     pprint(tick_data)
 
-
     # Get the last num_days days trades between 10AM and 12AM
     # Limit to max_ticks ticks otherwise too much will be printed on screen
     bgn_flt = datetime.time(hour=10, minute=0, second=0)
@@ -127,7 +127,6 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
                                                  end_flt=end_flt,
                                                  max_ticks=max_ticks)
     pprint(tick_data)
-
 
     # Get all ticks between 9:30AM 5 days ago and 9:30AM today
     # Limit to max_ticks since otherwise too much will be printed on
@@ -157,7 +156,7 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
 
 
 def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
-                            num_bars:int):
+                            num_bars: int):
     """Shows how to get interval bars."""
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-historical-bars")
     hist_conn.start_runner()
@@ -176,7 +175,7 @@ def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
     del hist_conn
 
 
-def get_daily_data(ticker:str, num_days: int):
+def get_daily_data(ticker: str, num_days: int):
     """Historical Daily Data"""
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-daily-data")
     hist_conn.start_runner()
@@ -338,7 +337,7 @@ def get_news():
     pprint(cfg)
 
     headlines = news_conn.request_news_headlines(
-        sources='', symbols='', date=None, limit=10);
+        sources=[], symbols=[], date=None, limit=10)
     pprint(headlines)
 
     story_id = headlines[0].story_id
@@ -395,7 +394,10 @@ if __name__ == "__main__":
     if results.historical_tickdata:
         get_tickdata(ticker="SPY", max_ticks=100, num_days=2)
     if results.historical_bars:
-        get_historical_bar_data(ticker="SPY", bar_len=60, bar_unit='s', num_bars=100)
+        get_historical_bar_data(ticker="SPY",
+                                bar_len=60,
+                                bar_unit='s',
+                                num_bars=100)
     if results.historical_daily_data:
         get_daily_data(ticker="SPY", num_days=10)
     if results.reference_data:

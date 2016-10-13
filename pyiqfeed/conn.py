@@ -3481,7 +3481,7 @@ class NewsConn(FeedConn):
 
         sources_str = ''
         if sources is not None:
-           sources_str = ":".join(sources)
+            sources_str = ":".join(sources)
 
         symbols_str = ''
         if symbols is not None:
@@ -3616,6 +3616,4 @@ class NewsConn(FeedConn):
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(xml_data[0]))
                 raise RuntimeError(err_msg)
         return self._create_story_counts(xml_data)
-
-
 

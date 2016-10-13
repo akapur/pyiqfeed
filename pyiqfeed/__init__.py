@@ -12,4 +12,3 @@ from .service import FeedService
 
 from .exceptions import NoDataError, UnexpectedField, UnexpectedMessage
 from .exceptions import UnexpectedProtocol
-

@@ -48,7 +48,7 @@ def _is_iqfeed_running():
             rl = select.select([s], [], [], 0.5)
             while rl[0]:
                 # Read startup messages otherwise you get a zombie socket
-                buf = s.recv(16384)
+                s.recv(16384)
                 rl = select.select([s], [], [], 0.5)
             s.shutdown(socket.SHUT_RDWR)
             s.close()
