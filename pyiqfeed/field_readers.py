@@ -6,8 +6,8 @@ Functions used to parse individual fields in the feed.
 """
 
 import typing
-import numpy as np
 import datetime
+import numpy as np
 from pyiqfeed.exceptions import UnexpectedField
 
 
@@ -111,7 +111,7 @@ def read_split_string(split_str: str) -> typing.Tuple[np.float64,
     return split_data
 
 
-def read_hhmmss_nocolon(field: str) -> int:
+def read_hhmmss_no_colon(field: str) -> int:
     """Read a HH:MM:SS field and return us since midnight."""
     if field != "":
         hour = int(field[0:2])
@@ -186,7 +186,7 @@ def read_live_news_timestamp(dt_tm: str) -> typing.Tuple[datetime.date, int]:
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
         dt = read_ccyymmdd(date_str)
-        tm = read_hhmmss_nocolon(time_str)
+        tm = read_hhmmss_no_colon(time_str)
         return dt, tm
     else:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
@@ -285,4 +285,3 @@ def datetime_to_yyyymmdd_hhmmss(dt_tm: datetime.datetime) -> str:
                                               dt_tm.second)
     else:
         return ""
-

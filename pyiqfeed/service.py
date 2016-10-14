@@ -87,11 +87,12 @@ class FeedService:
         self.login = login
         self.password = password
 
-    def launch(self, timeout: int=20) -> None:
+    def launch(self, timeout: int=20, check_conn: bool = True) -> None:
         """
         Launch IQConnect.exe if necessary
 
         :param timeout: Throw if IQConnect is not listening in timeout secs.
+        :param check_conn: Try opening connections to IQFeed before returning.
         :return: True if IQConnect is now listening for connections
 
         """
@@ -108,10 +109,8 @@ class FeedService:
                 SW_SHOWNORMAL = __import__('win32con').SW_SHOWNORMAL
                 ShellExecute(0, "open", "IQConnect.exe", iqfeed_args, "",
                              SW_SHOWNORMAL)
-
             elif sys.platform == 'darwin' or sys.platform == 'linux':
                 iqfeed_call = "nohup wine iqconnect.exe %s" % iqfeed_args
-                print(iqfeed_call)
                 subprocess.Popen(iqfeed_call,
                                  shell=True,
                                  stdin=subprocess.DEVNULL,
@@ -119,12 +118,12 @@ class FeedService:
                                  stderr=subprocess.DEVNULL,
                                  preexec_fn=os.setpgrp)
                 time.sleep(1)
-
-            start_time = time.time()
-            while not _is_iqfeed_running():
-                time.sleep(1)
-                if time.time() - start_time > timeout:
-                    raise RuntimeError("Launching IQFeed timed out.")
+            if check_conn:
+                start_time = time.time()
+                while not _is_iqfeed_running():
+                    time.sleep(1)
+                    if time.time() - start_time > timeout:
+                        raise RuntimeError("Launching IQFeed timed out.")
 
     def admin_variables(self):
         """Return a dict of admin variables used to launch"""

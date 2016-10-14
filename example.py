@@ -1,12 +1,22 @@
 #! /usr/bin/env python3
 # coding=utf-8
+"""
+Some examples of how to use the library.
+
+Run first with no options to see the usage message.
+Then try with different options to see that different functionality. Not all
+library functionality is used in this file. Look at conn.py and listeners.py
+for more details.
+"""
+
 
 import time
 import datetime
-import pyiqfeed as iq
-from pprint import pprint
 import argparse
+from pprint import pprint
 
+import numpy as np
+import pyiqfeed as iq
 from passwords import dtn_product_id, dtn_login, dtn_password
 
 
@@ -252,6 +262,7 @@ def get_equity_option_chain(ticker: str):
     lookup_listener = iq.VerboseIQFeedListener("EqOptionListener")
     lookup_conn.add_listener(lookup_listener)
     lookup_conn.start_runner()
+    # noinspection PyArgumentEqualDefault
     e_opt = lookup_conn.request_equity_option_chain(
         symbol=ticker,
         opt_type='pc',
@@ -281,7 +292,7 @@ def get_futures_chain(ticker: str):
         near_months=None,
         timeout=None)
     print("Futures symbols with underlying %s" % ticker)
-    print(f_syms)
+    pprint(f_syms)
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
     del lookup_conn
@@ -301,7 +312,7 @@ def get_futures_spread_chain(ticker: str):
         near_months=None,
         timeout=None)
     print("Futures Spread symbols with underlying %s" % ticker)
-    print(f_syms)
+    pprint(f_syms)
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
     del lookup_conn
@@ -321,36 +332,45 @@ def get_futures_options_chain(ticker: str):
         near_months=None,
         timeout=None)
     print("Futures Option symbols with underlying %s" % ticker)
-    print(f_syms)
+    pprint(f_syms)
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
     del lookup_conn
 
 
 def get_news():
+    """Exercise NewsConn functionality"""
     news_conn = iq.NewsConn("pyiqfeed-example-News-Conn")
     news_listener = iq.VerboseIQFeedListener("NewsListener")
     news_conn.add_listener(news_listener)
     news_conn.start_runner()
 
     cfg = news_conn.request_news_config()
+    print("News Configuration:")
     pprint(cfg)
+    print("")
 
+    print("Latest 10 headlines:")
     headlines = news_conn.request_news_headlines(
         sources=[], symbols=[], date=None, limit=10)
     pprint(headlines)
+    print("")
 
     story_id = headlines[0].story_id
     story = news_conn.request_news_story(story_id)
-    pprint(story.story)
+    print("Text of story with story id: %s:" % story_id)
+    print(story.story)
+    print("")
 
     today = datetime.date.today()
-    week_ago = today - datetime.timedelta(days=5)
+    week_ago = today - datetime.timedelta(days=7)
 
     counts = news_conn.request_story_counts(
         symbols=["AAPL", "IBM", "TSLA"],
         bgn_dt=week_ago, end_dt=today)
+    print("Number of news stories in last week for AAPL, IBM and TSLA:")
     pprint(counts)
+    print("")
 
 
 if __name__ == "__main__":
@@ -382,15 +402,15 @@ if __name__ == "__main__":
     launch_service()
 
     if results.level_1:
-        get_level_1_quotes_and_trades(ticker="SPY", seconds=10)
+        get_level_1_quotes_and_trades(ticker="SPY", seconds=30)
     if results.regional_quotes:
-        get_regional_quotes(ticker="SPY", seconds=10)
+        get_regional_quotes(ticker="SPY", seconds=120)
     if results.trade_updates:
-        get_trades_only(ticker="SPY", seconds=10)
+        get_trades_only(ticker="SPY", seconds=30)
     if results.interval_data:
-        get_live_interval_bars(ticker="SPY", bar_len=15, seconds=20)
+        get_live_interval_bars(ticker="SPY", bar_len=5, seconds=30)
     if results.admin_socket:
-        get_administrative_messages(seconds=5)
+        get_administrative_messages(seconds=30)
     if results.historical_tickdata:
         get_tickdata(ticker="SPY", max_ticks=100, num_days=2)
     if results.historical_bars:

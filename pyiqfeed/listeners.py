@@ -28,8 +28,8 @@ output.
 
 """
 
-import numpy as np
 from typing import Sequence
+import numpy as np
 from .conn import FeedConn, AdminConn, QuoteConn
 
 
@@ -478,7 +478,7 @@ class VerboseQuoteListener(VerboseIQFeedListener):
         print(quote)
 
     def process_summary(self, summary: np.array) -> None:
-        # print("%s: Data Summary" % self._name)
+        print("%s: Data Summary" % self._name)
         print(summary)
 
     def process_update(self, update: np.array) -> None:
@@ -486,8 +486,7 @@ class VerboseQuoteListener(VerboseIQFeedListener):
         print(update)
 
     def process_fundamentals(self, fund: np.array) -> None:
-        # print("%s: Fundamentals Received:" % self._name)
-        print("%s: Fundamentals Update" % self._name)
+        print("%s: Fundamentals Received:" % self._name)
         print(fund)
 
     def process_auth_key(self, key: str) -> None:
@@ -502,11 +501,11 @@ class VerboseQuoteListener(VerboseIQFeedListener):
         print(cust_info)
 
     def process_watched_symbols(self, symbols: Sequence[str]):
-        print("List of subscribed symbols:")
+        print("%s: List of subscribed symbols:" % self._name)
         print(symbols)
 
     def process_log_levels(self, levels: Sequence[str]) -> None:
-        print("Active Log levels:")
+        print("%s: Active Log levels:" % self._name)
         print(levels)
 
     def process_symbol_limit_reached(self, sym: str) -> None:

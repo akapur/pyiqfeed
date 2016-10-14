@@ -90,7 +90,7 @@ For all pull requests please ensure the following:
  that are built into CPython and numpy. Please do not import other third-party
  packages, not even pandas, not even in example or test code.
 
-4. Documentation is good. But gratuitious documentation is bad. The best
+4. Documentation is good. But gratuitous documentation is bad. The best
  documentation is well chosen names and simple code so you don't have to read
  anything to understand what it does. Remember comments also have to be
  maintained and the worst kind of comments are those that out of sync with the
@@ -104,7 +104,7 @@ For all pull requests please ensure the following:
  errors are VERY EXPENSIVE so if you think you need to describe something
  tricky in a comment, DON'T. Change what you are doing so it's not tricky
  instead. That having been said concise pydocs which describe how to use
- functions and interaces that you expect users to use is good. Efficiency
+ functions and interfaces that you expect users to use is good. Efficiency
  is important but nobody is going to use either IQFeed or Python in a latency
  sensitive context so don't do anything tricky just to get an extra 1%.
  

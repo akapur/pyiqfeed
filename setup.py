@@ -1,4 +1,5 @@
 # coding=utf-8
+"""Install pyiqfeed into your library path."""
 
 from setuptools import setup
 

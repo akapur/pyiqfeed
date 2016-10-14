@@ -36,7 +36,7 @@ class UnexpectedMessage(BaseException):
 
 class UnexpectedProtocol(BaseException):
     """
-    Raised when IQFeed.exe's protocol does not match the library's protocol.
+    Raised when IQFeed's protocol does not match the library's protocol.
 
     Deliberately derived from BaseException because this exception should
     not be caught and should result in a crash instead.

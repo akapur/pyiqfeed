@@ -54,6 +54,7 @@ import time
 
 from collections import deque, namedtuple
 from typing import Sequence, List, Callable
+# noinspection PyPep8Naming
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -124,7 +125,6 @@ class FeedConn:
 
     def _send_cmd(self, cmd: str) -> None:
         with self._send_lock:
-            print(cmd)
             # noinspection PyArgumentEqualDefault
             self._sock.sendall(cmd.encode(encoding='utf-8', errors='strict'))
 
@@ -238,7 +238,6 @@ class FeedConn:
                 self._name)
         if ready_list[0]:
             data_recvd = self._sock.recv(1024).decode('latin-1')
-            print(data_recvd)
             with self._buf_lock:
                 self._recv_buf += data_recvd
                 return True
@@ -273,15 +272,15 @@ class FeedConn:
         else:
             return self._process_unregistered_message
 
-    # noinspection PyMethodMayBeStatic
     def _process_unregistered_message(self, fields: Sequence[str]) -> None:
         """Called if we get a message we don't expect.
 
         Appropriate action here is probably to crash.
 
         """
-        raise UnexpectedMessage("Unexpected message received: %s",
-                                ",".join(fields))
+        err_msg = ("Unexpected message received by %s: %s" %
+                   (self._name, ",".join(fields)))
+        raise UnexpectedMessage(err_msg)
 
     def _process_system_message(self, fields: Sequence[str]) -> None:
         """
@@ -307,7 +306,6 @@ class FeedConn:
         else:
             return self._process_unregistered_system_message
 
-    # noinspection PyMethodMayBeStatic
     def _process_unregistered_system_message(self,
                                              fields: Sequence[str]) -> None:
         """
@@ -316,10 +314,10 @@ class FeedConn:
         Appropriate action here is probably to crash.
 
         """
-        raise UnexpectedMessage("Unexpected system message received: %s",
-                                ",".join(fields))
+        err_msg = ("Unexpected message received by %s: %s" %
+                   (self._name, ",".join(fields)))
+        raise UnexpectedMessage(err_msg)
 
-    # noinspection PyMethodMayBeStatic
     def _process_current_protocol(self, fields: Sequence[str]) -> None:
         """
         Process the Current Protocol Message
@@ -336,9 +334,9 @@ class FeedConn:
         assert fields[1] == "CURRENT PROTOCOL"
         protocol = fields[2]
         if protocol != FeedConn.protocol:
-            raise UnexpectedProtocol(
-                "Desired Protocol %s, Server Says Protocol %s" %
-                (FeedConn.protocol, protocol))
+            err_msg = ("Desired Protocol %s, Server Says Protocol %s in %s" %
+                       (FeedConn.protocol, protocol, self._name))
+            raise UnexpectedProtocol(err_msg)
 
     def _process_server_disconnected(self, fields: Sequence[str]) -> None:
         """Called when IQFeed.exe disconnects from DTN's servers."""
@@ -904,11 +902,11 @@ class QuoteConn(FeedConn):
         msg['Balance Sheet Date'] = fr.read_mmddccyy(fields[31])
         msg['Long-term Debt'] = fr.read_float64(fields[32])
         msg['Common Shares Outstanding'] = fr.read_float64(fields[33])
-        (fact, dt) = fr.read_split_string(fields[35])
-        msg['Split Factor 1 Date'] = dt
+        (fact, split_date) = fr.read_split_string(fields[35])
+        msg['Split Factor 1 Date'] = split_date
         msg['Split Factor 1'] = fact
-        (fact, dt) = fr.read_split_string(fields[36])
-        msg['Split Factor 2 Date'] = dt
+        (fact, split_date) = fr.read_split_string(fields[36])
+        msg['Split Factor 2 Date'] = split_date
         msg['Split Factor 2'] = fact
         msg['Format Code'] = fr.read_uint8(fields[39])
         msg['Precision'] = fr.read_uint8(fields[40])
@@ -1000,7 +998,6 @@ class QuoteConn(FeedConn):
         for listener in self._listeners:
             listener.process_ip_addresses_used(ip)
 
-    # noinspection PyMethodMayBeStatic
     def _process_fundamental_fieldnames(self, fields: Sequence[str]) -> None:
         """Process a fundamental data message."""
         assert len(fields) > 2
@@ -1008,14 +1005,15 @@ class QuoteConn(FeedConn):
         assert fields[1] == 'FUNDAMENTAL FIELDNAMES'
         for field in fields[2:]:
             if field not in QuoteConn.fundamental_fields:
-                raise RuntimeError(
-                    "%s not found in QuoteConn.dtn_fundamental_fields" % field)
+                err_msg = ("%s not found in dtn_fundamental_fields in %s" %
+                           (field, self._name))
+                raise UnexpectedField(err_msg)
         for field in QuoteConn.fundamental_fields:
             if field not in fields[2:]:
-                raise RuntimeError(
-                    "%s not found in FUNDAMENTAL FIELDNAMES message" % field)
+                err_msg = ("%s not found in FUNDAMENTAL FIELDNAMES in %s" %
+                           (field, self._name))
+                raise UnexpectedField(err_msg)
 
-    # noinspection PyMethodMayBeStatic
     def _process_update_fieldnames(self, fields: Sequence[str]) -> None:
         """
         Process a message giving us a list of all update fieldnames.
@@ -1029,12 +1027,14 @@ class QuoteConn(FeedConn):
         assert fields[1] == 'UPDATE FIELDNAMES'
         for field in fields[2:]:
             if field not in QuoteConn.quote_msg_map:
-                raise UnexpectedField(
-                    "%s not found in QuoteConn.dtn_update_map" % field)
+                err_msg = ("%s not found in dtn_update_map in %s" %
+                           (field, self._name))
+                raise UnexpectedField(err_msg)
         for field in QuoteConn.quote_msg_map:
             if field not in fields[2:]:
-                raise UnexpectedField(
-                    "%s not found in UPDATE FIELDNAMES message" % field)
+                err_msg = ("%s not found in UPDATE FIELDNAMES in %s" %
+                           (field, self._name))
+                raise UnexpectedField(err_msg)
 
     def _process_current_update_fieldnames(self, fields: Sequence[str]) -> None:
         """
@@ -1587,7 +1587,7 @@ class AdminConn(FeedConn):
         """
         self._send_cmd("S,SET PASSWORD,%s\r\n" % password)
 
-    def set_autoconnect(self, autoconnect: bool) -> None:
+    def set_autoconnect(self, autoconnect: bool = True) -> None:
         """
         Tells IQFeed to autoconnect to DTN servers on startup or not
 
@@ -1601,6 +1601,21 @@ class AdminConn(FeedConn):
             self._send_cmd("S,SET AUTOCONNECT,On\r\n")
         else:
             self._send_cmd("S,SET AUTOCONNECT,Off\r\n")
+
+    def save_login_info(self, save_info: bool = True) -> None:
+        """
+        Tells IQFeed to save the login info
+
+        :param save_info: True means save info, False means don't
+
+        process_login_info_[saved/no_saved] called on listeners to acknowledge
+        success.
+
+        """
+        if save_info:
+            self._send_cmd("S,SET SAVE LOGIN INFO,On\r\n")
+        else:
+            self._send_cmd("S,SET SAVE LOGIN INFO,Off\r\n")
 
     def client_stats_on(self) -> None:
         """
@@ -1624,19 +1639,14 @@ class AdminConn(FeedConn):
                             product: str,
                             login: str,
                             password: str,
-                            autoconnect: bool=True) -> None:
+                            autoconnect: bool=True,
+                            save_info: bool=True) -> None:
         """Set the administrative variables."""
         self.register_client_app(product)
         self.set_login(login)
         self.set_password(password)
         self.set_autoconnect(autoconnect)
-
-    def set_admin_variables_from_dict(self, avd: dict) -> None:
-        """Set the administrative variables from a dictionary."""
-        self.set_admin_variables(product=avd["product"],
-                                 login=avd["login"],
-                                 password=avd["password"],
-                                 autoconnect=avd["autoconnect"])
+        self.save_login_info(save_info)
 
 
 class HistoryConn(FeedConn):
@@ -3290,7 +3300,7 @@ class NewsConn(FeedConn):
     NewsStoryMsg = namedtuple("NewsStoryMsg",
                               ("story", "is_link"))
 
-    NewsCountMsg = namedtuple("NewsStoryMsg",
+    NewsCountMsg = namedtuple("NewsCountMsg",
                               ("symbol", "count"))
 
     def __init__(self, name: str="NewsConn",
@@ -3368,7 +3378,6 @@ class NewsConn(FeedConn):
             return np.array([res.err_msg], dtype='object')
         else:
             raw_text = '\n'.join([''.join(line[1:]) for line in res.raw_data])
-            print(raw_text)
             return ET.fromstring(raw_text)
 
     def _create_config_structure(self, xml_data: ET.Element) -> dict:
@@ -3408,8 +3417,8 @@ class NewsConn(FeedConn):
                 raise RuntimeError(err_msg)
         return self._create_config_structure(xml_data)
 
-    def _create_headline_list(self,
-                              xml_data: ET.Element) -> List[NewsMsg]:
+    @staticmethod
+    def _create_headline_list(xml_data: ET.Element) -> List[NewsMsg]:
         """Parse Headlines formatted as XML."""
         news_headlines = []
         for cur_headline in xml_data:
@@ -3502,7 +3511,8 @@ class NewsConn(FeedConn):
                 raise RuntimeError(err_msg)
         return self._create_headline_list(xml_data)
 
-    def _create_news_story(self, xml_data: ET.Element) -> NewsStoryMsg:
+    @staticmethod
+    def _create_news_story(xml_data: ET.Element) -> NewsStoryMsg:
         """Convert news stories into NewsStoryMsgs."""
         is_link = 'N'
         story = None
@@ -3562,7 +3572,8 @@ class NewsConn(FeedConn):
         req_cmd = "NSY,%s,e,%s,\r\n" % (story_id, address)
         self._send_cmd(req_cmd)
 
-    def _create_story_counts(self, xml_data: ET.Element) -> List[NewsCountMsg]:
+    @staticmethod
+    def _create_story_counts(xml_data: ET.Element) -> List[NewsCountMsg]:
         """Parse story counts and return as NewsCountMsg."""
         story_counts = []
         for count_data in xml_data:
@@ -3574,7 +3585,7 @@ class NewsConn(FeedConn):
 
     def request_story_counts(self,
                              symbols: List[str],
-                             sources: List[str] = None,
+                             sources: List[str]=None,
                              bgn_dt: datetime.date=None,
                              end_dt: datetime.date=None,
                              timeout: int=None) -> List[NewsCountMsg]:
@@ -3596,12 +3607,12 @@ class NewsConn(FeedConn):
         if sources is not None:
             sources_str = ":".join(sources)
 
-        date_strs = []
+        date_strings = []
         if bgn_dt is not None:
-            date_strs.append(fr.date_to_yyyymmdd(bgn_dt))
+            date_strings.append(fr.date_to_yyyymmdd(bgn_dt))
         if end_dt is not None:
-            date_strs.append(fr.date_to_yyyymmdd(end_dt))
-        date_range_str = "-".join(date_strs)
+            date_strings.append(fr.date_to_yyyymmdd(end_dt))
+        date_range_str = "-".join(date_strings)
 
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
@@ -3616,4 +3627,3 @@ class NewsConn(FeedConn):
                 err_msg = "Request: %s, Error: %s" % (req_cmd, str(xml_data[0]))
                 raise RuntimeError(err_msg)
         return self._create_story_counts(xml_data)
-
