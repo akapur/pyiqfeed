@@ -34,4 +34,3 @@
 # Crashlytics plugin (for Android Studio and IntelliJ)
 # Logins and Passwords used for testing
 passwords.py
-test_regionals.py
