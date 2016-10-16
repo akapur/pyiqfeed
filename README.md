@@ -26,7 +26,7 @@ If you are installing on OSX, install Wine or Wine-Devel using one of
 Homebrew, Macports, or Fink and then install IQFeed inside that. The Mac
 Download of IQFeed is basically just a CodeWeavers Wine "bottled" version
 of IQFeed, not a native Mac version and because it's been "bottled", passing
-arguments to IQFeed at startup is "complicated". This library assumes that
+arguments to IQFeed at startup is complicated. This library assumes that
 you have installed Wine and then IQFeed and are not using DTN's Mac download.
 If you choose to use the DTN package, things will still work but you
 will have to startup IQFeed yourself and pass it parameters like the App Name,
@@ -69,8 +69,6 @@ the bug will be ignored. Pull requests with bug-fixes and enhancements
 are greatly encouraged and appreciated.
 
 For all pull requests please ensure the following:
-
-
 
 1. Ensure all code has been run through at least some of the various python
  code checkers, preferably pylint. If you have IntelliJ or PyCharm, 
