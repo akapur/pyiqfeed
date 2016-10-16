@@ -19,16 +19,6 @@ def launch_service():
     svc.launch(check_conn=False)
     time.sleep(2)
 
-    # admin_conn = iq.AdminConn('regional-test-admin')
-    # admin_listener = iq.VerboseAdminListener('Admin-Listener')
-    # admin_conn.add_listener(admin_listener)
-    # admin_conn.start_runner()
-    # admin_conn.set_admin_variables(product=dtn_product_id,
-    #                                login=dtn_login,
-    #                                password=dtn_password,
-    #                                autoconnect=True,
-    #                                save_info=True)
-
 
 class RegionalOnlyListener(iq.SilentQuoteListener):
     def __init__(self, name: str):
