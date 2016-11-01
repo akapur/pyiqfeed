@@ -24,7 +24,7 @@ Read the comments and code in service.py for more details.
 
 """
 
-from pyiqfeed.passwords import dtn_product_id, dtn_login, dtn_password
+from passwords import dtn_product_id, dtn_login, dtn_password
 from pyiqfeed.service import FeedService
 
 if __name__ == "__main__":
