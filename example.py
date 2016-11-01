@@ -9,13 +9,11 @@ library functionality is used in this file. Look at conn.py and listeners.py
 for more details.
 """
 
-
 import time
 import datetime
 import argparse
 from pprint import pprint
 
-import numpy as np
 import pyiqfeed as iq
 from passwords import dtn_product_id, dtn_login, dtn_password
 
