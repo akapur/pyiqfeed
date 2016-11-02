@@ -15,7 +15,6 @@ import datetime
 import argparse
 from pprint import pprint
 
-import numpy as np
 import pyiqfeed as iq
 from passwords import dtn_product_id, dtn_login, dtn_password
 
