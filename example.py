@@ -9,7 +9,6 @@ library functionality is used in this file. Look at conn.py and listeners.py
 for more details.
 """
 
-
 import time
 import datetime
 import argparse
