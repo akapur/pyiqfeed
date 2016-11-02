@@ -125,6 +125,7 @@ class FeedConn:
 
     def _send_cmd(self, cmd: str) -> None:
         with self._send_lock:
+            print("Send Cmd: %s" % cmd)
             # noinspection PyArgumentEqualDefault
             self._sock.sendall(cmd.encode(encoding='utf-8', errors='strict'))
 
@@ -1840,8 +1841,8 @@ class HistoryConn(FeedConn):
 
         :param ticker: Ticker symbol
         :param max_ticks: The most recent max_ticks trades.
-        :param ascend: True means sorted latest to oldest, False opposite
-        :param timeout: Wait upto timeout seconds. Default None
+        :param ascend: True means sorted oldest to latest, False opposite
+        :param timeout: Wait for timeout seconds. Default None
         :return: A numpy array of dtype HistoryConn.tick_type
 
         HTX,[Symbol],[MaxDatapoints],[DataDirection],[RequestID],
@@ -1850,7 +1851,9 @@ class HistoryConn(FeedConn):
         """
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "HTX,%s,%d,%d,%s,\r\n" % (ticker, max_ticks, ascend, req_id)
+        pts_per_batch = min((max_ticks, 100))
+        req_cmd = ("HTX,%s,%d,%d,%s,%d\r\n" %
+                   (ticker, max_ticks, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_ticks(req_id)
@@ -1876,8 +1879,8 @@ class HistoryConn(FeedConn):
         :param num_days: Number of calendar days. 1 means today only.
         :param bgn_flt: Each day's data starting at bgn_flt
         :param end_flt: Each day's data no later than end_flt
-        :param ascend: True means sorted latest to oldest, False opposite
-        :param max_ticks: No more than max_ticks total ticks. Default None
+        :param ascend: True means sorted oldest to latest, False opposite
+        :param max_ticks: Only the most recent max_ticks trades. Default None
         :param timeout: Wait upto timeout seconds. Default None
         :return: A numpy array of dtype HistoryConn.tick_type
 
@@ -1890,9 +1893,12 @@ class HistoryConn(FeedConn):
         bf_str = fr.time_to_hhmmss(bgn_flt)
         ef_str = fr.time_to_hhmmss(end_flt)
         mt_str = fr.blob_to_str(max_ticks)
-        req_cmd = "HTD,%s,%d,%s,%s,%s,%d,%s,\r\n" % (ticker, num_days, mt_str,
-                                                     bf_str, ef_str, ascend,
-                                                     req_id)
+        pts_per_batch = 100
+        if max_ticks is not None:
+            pts_per_batch = min((max_ticks, 100))
+        req_cmd = ("HTD,%s,%d,%s,%s,%s,%d,%s,%d\r\n" %
+                   (ticker, num_days, mt_str, bf_str, ef_str,
+                    ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_ticks(req_id)
@@ -1921,8 +1927,8 @@ class HistoryConn(FeedConn):
         :param end_prd: End of the period.
         :param bgn_flt: Each day's data starting at bgn_flt
         :param end_flt: Each day's data no later than end_flt
-        :param ascend: True means sorted latest to oldest, False opposite
-        :param max_ticks: No more than max_ticks total ticks. Default None
+        :param ascend: True means sorted oldest to latest, False opposite
+        :param max_ticks: Only the most recent max_ticks trades. Default None
         :param timeout: Wait upto timeout seconds. Default None
         :return: A numpy array of dtype HistoryConn.tick_type
 
@@ -1938,9 +1944,12 @@ class HistoryConn(FeedConn):
         bf_str = fr.time_to_hhmmss(bgn_flt)
         ef_str = fr.time_to_hhmmss(end_flt)
         mt_str = fr.blob_to_str(max_ticks)
-        req_cmd = "HTT,%s,%s,%s,%s,%s,%s,%d,%s,\r\n" % (ticker, bp_str, ep_str,
-                                                        mt_str, bf_str, ef_str,
-                                                        ascend, req_id)
+        pts_per_batch = 100
+        if max_ticks is not None:
+            pts_per_batch = min((max_ticks, 100))
+        req_cmd = ("HTT,%s,%s,%s,%s,%s,%s,%d,%s,%d\r\n" %
+                   (ticker, bp_str, ep_str, mt_str, bf_str, ef_str,
+                    ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_ticks(req_id)
@@ -1990,16 +1999,16 @@ class HistoryConn(FeedConn):
         :param ticker: Ticker symbol
         :param interval_len: Length of each bar interval in interval_type units
         :param interval_type: 's' = secs, 'v' = volume, 't' = ticks
-        :param max_bars: Maximum number of bars starting now to return
-        :param ascend: True means latest to oldest, False opposite.
+        :param max_bars: Only the most recent max_bars bars. Default None
+        :param ascend: True means oldest to latest, False opposite.
         :param timeout: Wait no more than timeout secs. Default None
         :return: A numpy array with dtype HistoryConn.bar_type
 
         If you use an interval type other than seconds, please make sure
-        you understand what you are actually getting. The IQFeed docs
-        don't actually explain. Support may help. Best is to get the
-        tick-data and the bars and compare. In any event, bars other than
-        bars other than seconds bars where interval_len % 60 == 0 are only
+        you understand what you are getting. The IQFeed docs
+        don't explain. Support may help. Best is to get the tick-data and
+        the bars and compare. In any event, bars other than
+        seconds bars where interval_len % 60 == 0 are only
         available for the same period that tick-data is available for so
         you may be better off getting tick-data and creating your own bars.
 
@@ -2010,9 +2019,10 @@ class HistoryConn(FeedConn):
         assert interval_type in ('s', 'v', 't')
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "HIX,%s,%d,%d,%d,%s,,%s\r\n" % (ticker, interval_len,
-                                                  max_bars, ascend, req_id,
-                                                  interval_type)
+        bars_per_batch = min((100, max_bars))
+        req_cmd = ("HIX,%s,%d,%d,%d,%s,%d,%s\r\n" %
+                   (ticker, interval_len, max_bars, ascend, req_id,
+                    bars_per_batch, interval_type))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2043,15 +2053,15 @@ class HistoryConn(FeedConn):
         :param bgn_flt: Each day's data starting at bgn_flt
         :param end_flt: Each day's data no later than end_flt
         :param ascend: True means latest to oldest, False opposite.
-        :param max_bars: maximum number of bars to return
+        :param max_bars: Only the most recent max_bars bars. Default None
         :param timeout: Wait no more than timeout secs. Default None
         :return: A numpy array with dtype HistoryConn.bar_type
 
         If you use an interval type other than seconds, please make sure
-        you understand what you are actually getting. The IQFeed docs
-        don't actually explain. Support may help. Best is to get the
-        tick-data and the bars and compare. In any event, bars other than
-        bars other than seconds bars where interval_len % 60 == 0 are only
+        you understand what you are getting. The IQFeed docs
+        don't explain. Support may help. Best is to get the tick-data and
+        the bars and compare. In any event, bars other than
+        seconds bars where interval_len % 60 == 0 are only
         available for the same period that tick-data is available for so
         you may be better off getting tick-data and creating your own bars.
 
@@ -2066,9 +2076,12 @@ class HistoryConn(FeedConn):
         bf_str = fr.time_to_hhmmss(bgn_flt)
         ef_str = fr.time_to_hhmmss(end_flt)
         mb_str = fr.blob_to_str(max_bars)
-        req_cmd = "HID,%s,%d,%d,%s,%s,%s,%d,%s,,%s\r\n" % (
+        bars_per_batch = 100
+        if max_bars is not None:
+            bars_per_batch = min((100, max_bars))
+        req_cmd = "HID,%s,%d,%d,%s,%s,%s,%d,%s,%d,%s\r\n" % (
             ticker, interval_len, days, mb_str, bf_str, ef_str, ascend,
-            req_id, interval_type)
+            req_id, bars_per_batch, interval_type)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2102,16 +2115,16 @@ class HistoryConn(FeedConn):
         :param end_prd: End of the period
         :param bgn_flt: Each day's data starting at bgn_flt
         :param end_flt: Each day's data no later than end_flt
-        :param ascend: True means latest to oldest, False opposite.
-        :param max_bars: maximum number of bars to return
+        :param ascend: True means oldest to latest, False opposite.
+        :param max_bars: Only the most recent max_bars bars. Default None.
         :param timeout: Wait no more than timeout secs. Default None
         :return: A numpy array with dtype HistoryConn.bar_type
 
         If you use an interval type other than seconds, please make sure
-        you understand what you are actually getting. The IQFeed docs
-        don't actually explain. Support may help. Best is to get the
-        tick-data and the bars and compare. In any event, bars other than
-        bars other than seconds bars where interval_len % 60 == 0 are only
+        you understand what you are getting. The IQFeed docs
+        don't explain. Support may help. Best is to get the tick-data and
+        the bars and compare. In any event, bars other than
+        seconds bars where interval_len % 60 == 0 are only
         available for the same period that tick-data is available for so
         you may be better off getting tick-data and creating your own bars.
 
@@ -2128,10 +2141,13 @@ class HistoryConn(FeedConn):
         bf_str = fr.time_to_hhmmss(bgn_flt)
         ef_str = fr.time_to_hhmmss(end_flt)
         mb_str = fr.blob_to_str(max_bars)
-
-        req_cmd = "HIT,%s,%d,%s,%s,%s,%s,%s,%d,%s,,%s\r\n" % (
-            ticker, interval_len, bp_str, ep_str, mb_str,
-            bf_str, ef_str, ascend, req_id, interval_type)
+        bars_per_batch = 100
+        if max_bars is not None:
+            bars_per_batch = min((100, max_bars))
+        req_cmd = ("HIT,%s,%d,%s,%s,%s,%s,%s,%d,%s,%d,%s\r\n" %
+                   (ticker, interval_len, bp_str, ep_str, mb_str,
+                    bf_str, ef_str, ascend, req_id,
+                    bars_per_batch, interval_type))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2176,7 +2192,7 @@ class HistoryConn(FeedConn):
 
         :param ticker: Symbol
         :param num_days: Number of days. 1 means today only.
-        :param ascend: True means latest data first, False opposite.
+        :param ascend: True means oldest data first, False opposite.
         :param timeout: Wait timeout seconds. Default None
         :return: A numpy array with dtype HistoryConn.daily_type
 
@@ -2186,7 +2202,9 @@ class HistoryConn(FeedConn):
         """
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "HDX,%s,%d,%d,%s,\r\n" % (ticker, num_days, ascend, req_id)
+        pts_per_batch = min((100, num_days))
+        req_cmd = ("HDX,%s,%d,%d,%s,%d\r\n" %
+                   (ticker, num_days, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -2212,7 +2230,7 @@ class HistoryConn(FeedConn):
         :param ticker: Symbol
         :param bgn_dt: Earliest Date
         :param end_dt: Latest DAte
-        :param ascend: True means latest data first, False opposite.
+        :param ascend: True means oldest data first, False opposite.
         :param max_days: Maximum number of days to get data for.
         :param timeout: Wait timeout seconds. Default None
         :return: A numpy array with dtype HistoryConn.daily_type
@@ -2226,8 +2244,12 @@ class HistoryConn(FeedConn):
         bgn_str = fr.date_to_yyyymmdd(bgn_dt)
         end_str = fr.date_to_yyyymmdd(end_dt)
         md_str = fr.blob_to_str(max_days)
-        req_cmd = "HDT,%s,%s,%s,%s,%d,%s,\r\n" % (ticker, bgn_str, end_str,
-                                                  md_str, ascend, req_id)
+        pts_per_batch = 100
+        if max_days is not None:
+            pts_per_batch = min((100, max_days))
+        req_cmd = ("HDT,%s,%s,%s,%s,%d,%s,%d\r\n" %
+                   (ticker, bgn_str, end_str, md_str, ascend, req_id,
+                    pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -2248,7 +2270,7 @@ class HistoryConn(FeedConn):
 
         :param ticker: Symbol
         :param num_weeks: Number of weeks
-        :param ascend: True means latest data first, False opposite.
+        :param ascend: True means oldest data first, False opposite.
         :param timeout: Wait timeout seconds. Default None
         :return: A numpy array with dtype HistoryConn.daily_type
 
@@ -2258,7 +2280,9 @@ class HistoryConn(FeedConn):
         """
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "HWX,%s,%d,%d,%s,\r\n" % (ticker, num_weeks, ascend, req_id)
+        pts_per_batch = min((100, num_weeks))
+        req_cmd = ("HWX,%s,%d,%d,%s,%d\r\n" %
+                   (ticker, num_weeks, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -2279,7 +2303,7 @@ class HistoryConn(FeedConn):
 
         :param ticker: Symbol
         :param num_months: Number of months.
-        :param ascend: True means latest data first, False opposite.
+        :param ascend: True means oldest data first, False opposite.
         :param timeout: Wait timeout seconds. Default None
         :return: A numpy array with dtype HistoryConn.daily_type
 
@@ -2289,7 +2313,9 @@ class HistoryConn(FeedConn):
         """
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "HMX,%s,%d,%d,%s,\r\n" % (ticker, num_months, ascend, req_id)
+        pts_per_batch = min((100, num_months))
+        req_cmd = ("HMX,%s,%d,%d,%s,%d\r\n" %
+                   (ticker, num_months, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -3385,10 +3411,10 @@ class NewsConn(FeedConn):
         structure = xml_data.attrib
         structure["elem_type"] = xml_data.tag
         if len(xml_data) > 0:
-            descendents = []
+            descendants = []
             for elem in xml_data:
-                descendents.append(self._create_config_structure(elem))
-            structure["sub_elems"] = descendents
+                descendants.append(self._create_config_structure(elem))
+            structure["sub_elems"] = descendants
         return structure
 
     def request_news_config(self, timeout: int=None) -> dict:

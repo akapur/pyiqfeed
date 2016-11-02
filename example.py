@@ -9,13 +9,12 @@ library functionality is used in this file. Look at conn.py and listeners.py
 for more details.
 """
 
-import time
-import datetime
 import argparse
-from pprint import pprint
-
+import datetime
 import pyiqfeed as iq
+import time
 from passwords import dtn_product_id, dtn_login, dtn_password
+from pprint import pprint
 
 
 def launch_service():
@@ -173,10 +172,32 @@ def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
 
     # look at docs for request_bars, request_bars_for_days and
     # request_bars_in_period for other ways to specify time periods etc
-    bars = hist_conn.request_bars(ticker=ticker,
-                                  interval_len=bar_len,
-                                  interval_type=bar_unit,
-                                  max_bars=num_bars)
+    # bars = hist_conn.request_bars(ticker=ticker,
+    #                               interval_len=bar_len,
+    #                               interval_type=bar_unit,
+    #                               max_bars=num_bars)
+    # print(bars)
+
+    today = datetime.date.today()
+    # start_date = today - datetime.timedelta(days=10)
+    start_time = datetime.datetime(year=2010,
+                                   month=1,
+                                   day=1,
+                                   hour=0,
+                                   minute=0,
+                                   second=0)
+    end_time = datetime.datetime(year=today.year,
+                                 month=today.month,
+                                 day=today.day,
+                                 hour=23,
+                                 minute=59,
+                                 second=59)
+    bars = hist_conn.request_bars_in_period(
+        ticker=ticker,
+        interval_len=bar_len,
+        interval_type=bar_unit,
+        bgn_prd=start_time,
+        end_prd=end_time)
     pprint(bars)
     hist_conn.remove_listener(hist_listener)
     hist_conn.stop_runner()
