@@ -87,21 +87,27 @@ class FeedService:
         self.login = login
         self.password = password
 
-    def launch(self, timeout: int=20, check_conn: bool = True) -> None:
+    def launch(self,
+               timeout: int=20,
+               check_conn: bool = True,
+               headless: bool = False,
+               launch_log: str = "~/nohup_launch_iqfeed.log") -> None:
         """
         Launch IQConnect.exe if necessary
 
         :param timeout: Throw if IQConnect is not listening in timeout secs.
         :param check_conn: Try opening connections to IQFeed before returning.
-        :return: True if IQConnect is now listening for connections
+        :param headless: Set to true if running in headless mode on X windows.
+        :param launch_log: Logs errors while launching IQFeed. This is NOT the
+            IQFeed log file.
+        :return: True if IQConnect is now listening for connections.
 
         """
         # noinspection PyPep8
-        iqfeed_args = "-product %s -version %s, -login %s -password %s -autoconnect -savelogininfo" % (
-            self.product, self.version, self.login, self.password)
+        iqfeed_args = ("-product %s -version %s -login %s -password %s -autoconnect -savelogininfo" %
+                       (self.product, self.version, self.login, self.password))
 
         if not _is_iqfeed_running():
-
             if sys.platform == 'win32':
                 # noinspection PyPep8Naming
                 ShellExecute = __import__('win32api').ShellExecute
@@ -110,7 +116,18 @@ class FeedService:
                 ShellExecute(0, "open", "IQConnect.exe", iqfeed_args, "",
                              SW_SHOWNORMAL)
             elif sys.platform == 'darwin' or sys.platform == 'linux':
-                iqfeed_call = "nohup wine iqconnect.exe %s" % iqfeed_args
+                if launch_log is None:
+                        raise RuntimeError(
+                            "Must set a log file for logging launch errors.")
+                base_iqfeed_call = "wine iqconnect.exe %s" % iqfeed_args
+                if headless:
+                    iqfeed_call = ("nohup xvfb-run -s -noreset -a %s > %s" %
+                                   (base_iqfeed_call, launch_log))
+                else:
+                    iqfeed_call = ("nohup %s > %s" %
+                                   (base_iqfeed_call, launch_log))
+
+                print("Running %s" % iqfeed_call)
                 subprocess.Popen(iqfeed_call,
                                  shell=True,
                                  stdin=subprocess.DEVNULL,

@@ -24,14 +24,14 @@ Read the comments and code in service.py for more details.
 
 """
 
+import pyiqfeed as pi
 from passwords import dtn_product_id, dtn_login, dtn_password
-from pyiqfeed.service import FeedService
 
 if __name__ == "__main__":
-    IQ_FEED = FeedService(product=dtn_product_id,
-                          version="IQFEED_LAUNCHER",
-                          login=dtn_login,
-                          password=dtn_password)
+    IQ_FEED = pi.FeedService(product=dtn_product_id,
+                             version="IQFEED_LAUNCHER",
+                             login=dtn_login,
+                             password=dtn_password)
     IQ_FEED.launch()
 
     # Your code to connect to the socket etc as described above here

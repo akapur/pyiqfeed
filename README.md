@@ -36,6 +36,12 @@ line at startup.
 On Ubuntu, use the Wine-Devel from the Wine Development Team's ppa, not the
 Wine that comes from Canonical.
 
+If you want to run headless you need to have the package xvfb installed.
+IQFeed.exe is launched under wine and wants to create a GUI. If X isn't
+running, wine will crash. If you have the xvfb, virtual framebuffer
+"fake" X server running, this fools wine into believing it has launched the
+IQFeed.exe GUI. This is also useful if you find the IQFeed.exe gui annoying.
+
 You cannot install IQFeed in a Windows Virtual Machine on the same
 physical machine. It won't work unless you subscribe to data while running
 within the same virtual machine. DTN does not allow you to get data on a
