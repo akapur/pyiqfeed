@@ -8,7 +8,7 @@
 
 # User-specific stuff:
 # Sensitive or high-churn files:
-#
+
 # Logins and Passwords used for testing
 passwords.py
 
