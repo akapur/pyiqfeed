@@ -116,7 +116,8 @@ class FeedConn:
         self._read_thread = threading.Thread(group=None, target=self,
                                              name="%s-reader" % self._name,
                                              args=(),
-                                             kwargs={}, daemon=True)
+                                             kwargs={},
+                                             daemon=None)
         self._set_message_mappings()
         self._connect(host, port)
 
@@ -125,7 +126,6 @@ class FeedConn:
 
     def _send_cmd(self, cmd: str) -> None:
         with self._send_lock:
-            print("Send Cmd: %s" % cmd)
             # noinspection PyArgumentEqualDefault
             self._sock.sendall(cmd.encode(encoding='utf-8', errors='strict'))
 
@@ -257,13 +257,12 @@ class FeedConn:
 
     def _process_messages(self) -> None:
         """Process the next complete message waiting to be processed"""
-        with self._buf_lock:
+        message = self._next_message()
+        while "" != message:
+            fields = message.split(',')
+            handle_func = self._processing_function(fields)
+            handle_func(fields)
             message = self._next_message()
-            while "" != message:
-                fields = message.split(',')
-                handle_func = self._processing_function(fields)
-                handle_func(fields)
-                message = self._next_message()
 
     def _processing_function(self, fields) -> Callable[[Sequence[str]], None]:
         """Returns the processing function for this specific message."""
@@ -1722,7 +1721,8 @@ class HistoryConn(FeedConn):
         self._req_event = {}
         self._req_failed = {}
         self._req_err = {}
-        self._buf_lock = threading.RLock()
+        self._req_lock = threading.RLock()
+        self._req_num_lock = threading.RLock()
 
     def _set_message_mappings(self) -> None:
         """Set the message mappings"""
@@ -1750,13 +1750,13 @@ class HistoryConn(FeedConn):
             self._req_numlines[req_id] += 1
 
     def _get_next_req_id(self) -> str:
-        with self._buf_lock:
+        with self._req_num_lock:
             req_id = "H_%.10d" % self._req_num
             self._req_num += 1
             return req_id
 
     def _cleanup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_lock:
             del self._req_failed[req_id]
             del self._req_err[req_id]
             del self._req_buf[req_id]
@@ -1764,7 +1764,7 @@ class HistoryConn(FeedConn):
 
     def _setup_request_data(self, req_id: str) -> None:
         """Setup empty buffers and other variables for a request."""
-        with self._buf_lock:
+        with self._req_lock:
             self._req_buf[req_id] = deque()
             self._req_numlines[req_id] = 0
             self._req_failed[req_id] = False
@@ -1773,7 +1773,7 @@ class HistoryConn(FeedConn):
 
     def _get_data_buf(self, req_id: str) -> namedtuple:
         """Get the data buffer associated with a specific request."""
-        with self._buf_lock:
+        with self._req_lock:
             buf = HistoryConn._databuf(
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
@@ -2638,7 +2638,7 @@ class LookupConn(FeedConn):
         self._req_event = {}
         self._req_failed = {}
         self._req_err = {}
-        self._buf_lock = threading.RLock()
+        self._req_lock = threading.RLock()
 
     def _set_message_mappings(self) -> None:
         super()._set_message_mappings()
@@ -2665,20 +2665,20 @@ class LookupConn(FeedConn):
             self._req_numlines[req_id] += 1
 
     def _get_next_req_id(self) -> str:
-        with self._buf_lock:
+        with self._req_lock:
             req_id = "L_%.10d" % self._req_num
             self._req_num += 1
             return req_id
 
     def _cleanup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_lock:
             del self._req_failed[req_id]
             del self._req_err[req_id]
             del self._req_buf[req_id]
             del self._req_numlines[req_id]
 
     def _setup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_lock:
             self._req_buf[req_id] = deque()
             self._req_numlines[req_id] = 0
             self._req_failed[req_id] = False
@@ -2687,7 +2687,7 @@ class LookupConn(FeedConn):
 
     def _get_data_buf(self, req_id: str) -> namedtuple:
         """Get the data buffer for a specific request."""
-        with self._buf_lock:
+        with self._req_lock:
             buf = LookupConn._databuf(
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
@@ -3339,7 +3339,7 @@ class NewsConn(FeedConn):
         self._req_event = {}
         self._req_failed = {}
         self._req_err = {}
-        self._buf_lock = threading.RLock()
+        self._req_lock = threading.RLock()
 
     def _set_message_mappings(self) -> None:
         super()._set_message_mappings()
@@ -3366,20 +3366,20 @@ class NewsConn(FeedConn):
             self._req_numlines[req_id] += 1
 
     def _get_next_req_id(self) -> str:
-        with self._buf_lock:
+        with self._req_lock:
             req_id = "N_%.10d" % self._req_num
             self._req_num += 1
             return req_id
 
     def _cleanup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_lock:
             del self._req_failed[req_id]
             del self._req_err[req_id]
             del self._req_buf[req_id]
             del self._req_numlines[req_id]
 
     def _setup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_lock:
             self._req_buf[req_id] = deque()
             self._req_numlines[req_id] = 0
             self._req_failed[req_id] = False
@@ -3387,7 +3387,7 @@ class NewsConn(FeedConn):
             self._req_event[req_id] = threading.Event()
 
     def _get_data_buf(self, req_id: str) -> namedtuple:
-        with self._buf_lock:
+        with self._req_lock:
             buf = NewsConn._databuf(
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
