@@ -90,16 +90,13 @@ class FeedService:
     def launch(self,
                timeout: int=20,
                check_conn: bool = True,
-               headless: bool = False,
-               launch_log: str = "~/nohup_launch_iqfeed.log") -> None:
+               headless: bool = False) -> None:
         """
         Launch IQConnect.exe if necessary
 
         :param timeout: Throw if IQConnect is not listening in timeout secs.
         :param check_conn: Try opening connections to IQFeed before returning.
         :param headless: Set to true if running in headless mode on X windows.
-        :param launch_log: Logs errors while launching IQFeed. This is NOT the
-            IQFeed log file.
         :return: True if IQConnect is now listening for connections.
 
         """
@@ -116,16 +113,12 @@ class FeedService:
                 ShellExecute(0, "open", "IQConnect.exe", iqfeed_args, "",
                              SW_SHOWNORMAL)
             elif sys.platform == 'darwin' or sys.platform == 'linux':
-                if launch_log is None:
-                        raise RuntimeError(
-                            "Must set a log file for logging launch errors.")
                 base_iqfeed_call = "wine iqconnect.exe %s" % iqfeed_args
                 if headless:
-                    iqfeed_call = ("nohup xvfb-run -s -noreset -a %s > %s" %
-                                   (base_iqfeed_call, launch_log))
+                    iqfeed_call = ("nohup xvfb-run -s -noreset -a %s" %
+                                   base_iqfeed_call)
                 else:
-                    iqfeed_call = ("nohup %s > %s" %
-                                   (base_iqfeed_call, launch_log))
+                    iqfeed_call = ("nohup %s" % base_iqfeed_call)
 
                 print("Running %s" % iqfeed_call)
                 subprocess.Popen(iqfeed_call,

@@ -30,9 +30,9 @@ def get_level_1_quotes_and_trades(ticker: str, seconds: int):
     """Get level 1 quotes and trades for ticker for seconds seconds."""
 
     quote_conn = iq.QuoteConn(name="pyiqfeed-Example-lvl1")
-    quote_conn.start_runner()
     quote_listener = iq.VerboseQuoteListener("Level 1 Listener")
     quote_conn.add_listener(quote_listener)
+    quote_conn.start_runner()
 
     all_fields = sorted(list(iq.QuoteConn.quote_msg_map.keys()))
     quote_conn.select_update_fieldnames(all_fields)
@@ -48,9 +48,9 @@ def get_regional_quotes(ticker: str, seconds: int):
     """Get level 1 quotes and trades for ticker for seconds seconds."""
 
     quote_conn = iq.QuoteConn(name="pyiqfeed-Example-regional")
-    quote_conn.start_runner()
     quote_listener = iq.VerboseQuoteListener("Regional Listener")
     quote_conn.add_listener(quote_listener)
+    quote_conn.start_runner()
 
     quote_conn.regional_watch(ticker)
     time.sleep(seconds)
@@ -64,9 +64,9 @@ def get_trades_only(ticker: str, seconds: int):
     """Get level 1 quotes and trades for ticker for seconds seconds."""
 
     quote_conn = iq.QuoteConn(name="pyiqfeed-Example-trades-only")
-    quote_conn.start_runner()
     quote_listener = iq.VerboseQuoteListener("Trades Listener")
     quote_conn.add_listener(quote_listener)
+    quote_conn.start_runner()
 
     quote_conn.trades_watch(ticker)
     time.sleep(seconds)
@@ -79,9 +79,9 @@ def get_trades_only(ticker: str, seconds: int):
 def get_live_interval_bars(ticker: str, bar_len: int, seconds: int):
     """Get real-time interval bars"""
     bar_conn = iq.BarConn(name='pyiqfeed-Example-interval-bars')
-    bar_conn.start_runner()
     bar_listener = iq.VerboseBarListener("Bar Listener")
     bar_conn.add_listener(bar_listener)
+    bar_conn.start_runner()
 
     bar_conn.watch(symbol=ticker, interval_len=bar_len,
                    interval_type='s', update=1, lookback_bars=10)
@@ -96,9 +96,9 @@ def get_administrative_messages(seconds: int):
     """Run and AdminConn and print connection stats to screen."""
 
     admin_conn = iq.AdminConn(name="pyiqfeed-Example-admin-messages")
-    admin_conn.start_runner()
     admin_listener = iq.VerboseAdminListener("Admin Listener")
     admin_conn.add_listener(admin_listener)
+    admin_conn.start_runner()
     admin_conn.set_admin_variables(product=dtn_product_id,
                                    login=dtn_login,
                                    password=dtn_password,
@@ -111,9 +111,9 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
     """Show how to read tick-data"""
 
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-tickdata")
-    hist_conn.start_runner()
     hist_listener = iq.VerboseIQFeedListener("History Tick Listener")
     hist_conn.add_listener(hist_listener)
+    hist_conn.start_runner()
 
     # Look at docs for request_ticks, request_ticks_for_days and
     # request_ticks_in_period to see various ways to specify time periods
@@ -165,9 +165,9 @@ def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
                             num_bars: int):
     """Shows how to get interval bars."""
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-historical-bars")
-    hist_conn.start_runner()
     hist_listener = iq.VerboseIQFeedListener("History Bar Listener")
     hist_conn.add_listener(hist_listener)
+    hist_conn.start_runner()
 
     # look at docs for request_bars, request_bars_for_days and
     # request_bars_in_period for other ways to specify time periods etc
@@ -206,9 +206,9 @@ def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
 def get_daily_data(ticker: str, num_days: int):
     """Historical Daily Data"""
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-daily-data")
-    hist_conn.start_runner()
     hist_listener = iq.VerboseIQFeedListener("History Bar Listener")
     hist_conn.add_listener(hist_listener)
+    hist_conn.start_runner()
 
     daily_data = hist_conn.request_daily_data(ticker, num_days)
     hist_conn.remove_listener(hist_listener)

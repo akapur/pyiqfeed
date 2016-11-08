@@ -1723,7 +1723,8 @@ class HistoryConn(FeedConn):
         self._req_event = {}
         self._req_failed = {}
         self._req_err = {}
-        self._buf_lock = threading.RLock()
+        self._req_buf_lock = threading.RLock()
+        self._req_num_lock = threading.RLock()
 
     def _set_message_mappings(self) -> None:
         """Set the message mappings"""
@@ -1751,13 +1752,13 @@ class HistoryConn(FeedConn):
             self._req_numlines[req_id] += 1
 
     def _get_next_req_id(self) -> str:
-        with self._buf_lock:
+        with self._req_num_lock:
             req_id = "H_%.10d" % self._req_num
             self._req_num += 1
             return req_id
 
     def _cleanup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_buf_lock:
             del self._req_failed[req_id]
             del self._req_err[req_id]
             del self._req_buf[req_id]
@@ -1765,7 +1766,7 @@ class HistoryConn(FeedConn):
 
     def _setup_request_data(self, req_id: str) -> None:
         """Setup empty buffers and other variables for a request."""
-        with self._buf_lock:
+        with self._req_buf_lock:
             self._req_buf[req_id] = deque()
             self._req_numlines[req_id] = 0
             self._req_failed[req_id] = False
@@ -1774,14 +1775,14 @@ class HistoryConn(FeedConn):
 
     def _get_data_buf(self, req_id: str) -> namedtuple:
         """Get the data buffer associated with a specific request."""
-        with self._buf_lock:
+        with self._req_buf_lock:
             buf = HistoryConn._databuf(
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
                 num_pts=self._req_numlines[req_id],
                 raw_data=self._req_buf[req_id]
             )
-        self._cleanup_request_data(req_id)
+            self._cleanup_request_data(req_id)
         return buf
 
     def _read_ticks(self, req_id: str) -> np.array:
@@ -2639,7 +2640,8 @@ class LookupConn(FeedConn):
         self._req_event = {}
         self._req_failed = {}
         self._req_err = {}
-        self._buf_lock = threading.RLock()
+        self._req_buf_lock = threading.RLock()
+        self._req_num_lock = threading.RLock()
 
     def _set_message_mappings(self) -> None:
         super()._set_message_mappings()
@@ -2666,20 +2668,20 @@ class LookupConn(FeedConn):
             self._req_numlines[req_id] += 1
 
     def _get_next_req_id(self) -> str:
-        with self._buf_lock:
+        with self._req_num_lock:
             req_id = "L_%.10d" % self._req_num
             self._req_num += 1
             return req_id
 
     def _cleanup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_buf_lock:
             del self._req_failed[req_id]
             del self._req_err[req_id]
             del self._req_buf[req_id]
             del self._req_numlines[req_id]
 
     def _setup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_buf_lock:
             self._req_buf[req_id] = deque()
             self._req_numlines[req_id] = 0
             self._req_failed[req_id] = False
@@ -2688,14 +2690,14 @@ class LookupConn(FeedConn):
 
     def _get_data_buf(self, req_id: str) -> namedtuple:
         """Get the data buffer for a specific request."""
-        with self._buf_lock:
+        with self._req_buf_lock:
             buf = LookupConn._databuf(
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
                 num_pts=self._req_numlines[req_id],
                 raw_data=self._req_buf[req_id]
             )
-        self._cleanup_request_data(req_id)
+            self._cleanup_request_data(req_id)
         return buf
 
     def _read_symbols(self, req_id: str) -> np.array:
@@ -3340,7 +3342,8 @@ class NewsConn(FeedConn):
         self._req_event = {}
         self._req_failed = {}
         self._req_err = {}
-        self._buf_lock = threading.RLock()
+        self._req_buf_lock = threading.RLock()
+        self._req_num_lock = threading.RLock()
 
     def _set_message_mappings(self) -> None:
         super()._set_message_mappings()
@@ -3367,20 +3370,20 @@ class NewsConn(FeedConn):
             self._req_numlines[req_id] += 1
 
     def _get_next_req_id(self) -> str:
-        with self._buf_lock:
+        with self._req_num_lock:
             req_id = "N_%.10d" % self._req_num
             self._req_num += 1
             return req_id
 
     def _cleanup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_buf_lock:
             del self._req_failed[req_id]
             del self._req_err[req_id]
             del self._req_buf[req_id]
             del self._req_numlines[req_id]
 
     def _setup_request_data(self, req_id: str) -> None:
-        with self._buf_lock:
+        with self._req_buf_lock:
             self._req_buf[req_id] = deque()
             self._req_numlines[req_id] = 0
             self._req_failed[req_id] = False
@@ -3388,7 +3391,7 @@ class NewsConn(FeedConn):
             self._req_event[req_id] = threading.Event()
 
     def _get_data_buf(self, req_id: str) -> namedtuple:
-        with self._buf_lock:
+        with self._req_buf_lock:
             buf = NewsConn._databuf(
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
