@@ -14,7 +14,6 @@ import datetime
 import pyiqfeed as iq
 import time
 from passwords import dtn_product_id, dtn_login, dtn_password
-from pprint import pprint
 
 
 def launch_service():
@@ -122,7 +121,7 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
 
     # Get the last 10 trades
     tick_data = hist_conn.request_ticks(ticker=ticker, max_ticks=max_ticks)
-    pprint(tick_data)
+    print(tick_data)
 
     # Get the last num_days days trades between 10AM and 12AM
     # Limit to max_ticks ticks otherwise too much will be printed on screen
@@ -133,7 +132,7 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
                                                  bgn_flt=bgn_flt,
                                                  end_flt=end_flt,
                                                  max_ticks=max_ticks)
-    pprint(tick_data)
+    print(tick_data)
 
     # Get all ticks between 9:30AM 5 days ago and 9:30AM today
     # Limit to max_ticks since otherwise too much will be printed on
@@ -156,7 +155,7 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
                                                   bgn_prd=start_tm,
                                                   end_prd=end_tm,
                                                   max_ticks=max_ticks)
-    pprint(tick_data)
+    print(tick_data)
     hist_conn.remove_listener(hist_listener)
     hist_conn.stop_runner()
     del hist_conn
@@ -172,17 +171,17 @@ def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
 
     # look at docs for request_bars, request_bars_for_days and
     # request_bars_in_period for other ways to specify time periods etc
-    # bars = hist_conn.request_bars(ticker=ticker,
-    #                               interval_len=bar_len,
-    #                               interval_type=bar_unit,
-    #                               max_bars=num_bars)
-    # print(bars)
+    bars = hist_conn.request_bars(ticker=ticker,
+                                  interval_len=bar_len,
+                                  interval_type=bar_unit,
+                                  max_bars=num_bars)
+    print(bars)
 
     today = datetime.date.today()
-    # start_date = today - datetime.timedelta(days=10)
-    start_time = datetime.datetime(year=2010,
-                                   month=1,
-                                   day=1,
+    start_date = today - datetime.timedelta(days=10)
+    start_time = datetime.datetime(year=start_date.year,
+                                   month=start_date.month,
+                                   day=start_date.day,
                                    hour=0,
                                    minute=0,
                                    second=0)
@@ -198,7 +197,7 @@ def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
         interval_type=bar_unit,
         bgn_prd=start_time,
         end_prd=end_time)
-    pprint(bars)
+    print(bars)
     hist_conn.remove_listener(hist_listener)
     hist_conn.stop_runner()
     del hist_conn
@@ -213,7 +212,7 @@ def get_daily_data(ticker: str, num_days: int):
 
     daily_data = hist_conn.request_daily_data(ticker, num_days)
     hist_conn.remove_listener(hist_listener)
-    pprint(daily_data)
+    print(daily_data)
     hist_conn.stop_runner()
     del hist_conn
 
@@ -225,23 +224,23 @@ def get_reference_data():
     table_conn.add_listener(table_listener)
     table_conn.update_tables()
     print("Markets:")
-    pprint(table_conn.get_markets())
+    print(table_conn.get_markets())
     print("")
 
     print("Security Types:")
-    pprint(table_conn.get_security_types())
+    print(table_conn.get_security_types())
     print("")
 
     print("Trade Conditions:")
-    pprint(table_conn.get_trade_conditions())
+    print(table_conn.get_trade_conditions())
     print("")
 
     print("SIC Codes:")
-    pprint(table_conn.get_sic_codes())
+    print(table_conn.get_sic_codes())
     print("")
 
     print("NAIC Codes:")
-    pprint(table_conn.get_naic_codes())
+    print(table_conn.get_naic_codes())
     print("")
     table_conn.remove_listener(table_listener)
     table_conn.stop_runner()
@@ -258,17 +257,17 @@ def get_ticker_lookups(ticker: str):
     syms = lookup_conn.request_symbols_by_filter(
         search_term=ticker, search_field='s')
     print("Symbols with %s in them" % ticker)
-    pprint(syms)
+    print(syms)
     print("")
 
     sic_symbols = lookup_conn.request_symbols_by_sic(83)
     print("Symbols in SIC 83:")
-    pprint(sic_symbols)
+    print(sic_symbols)
     print("")
 
     naic_symbols = lookup_conn.request_symbols_by_naic(10)
     print("Symbols in NAIC 10:")
-    pprint(naic_symbols)
+    print(naic_symbols)
     print("")
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
@@ -291,7 +290,7 @@ def get_equity_option_chain(ticker: str):
         include_binary=True,
         filt_type=0, filt_val_1=None, filt_val_2=None)
     print("Currently trading options for %s" % ticker)
-    pprint(e_opt)
+    print(e_opt)
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
     del lookup_conn
@@ -311,7 +310,7 @@ def get_futures_chain(ticker: str):
         near_months=None,
         timeout=None)
     print("Futures symbols with underlying %s" % ticker)
-    pprint(f_syms)
+    print(f_syms)
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
     del lookup_conn
@@ -331,7 +330,7 @@ def get_futures_spread_chain(ticker: str):
         near_months=None,
         timeout=None)
     print("Futures Spread symbols with underlying %s" % ticker)
-    pprint(f_syms)
+    print(f_syms)
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
     del lookup_conn
@@ -351,7 +350,7 @@ def get_futures_options_chain(ticker: str):
         near_months=None,
         timeout=None)
     print("Futures Option symbols with underlying %s" % ticker)
-    pprint(f_syms)
+    print(f_syms)
     lookup_conn.remove_listener(lookup_listener)
     lookup_conn.stop_runner()
     del lookup_conn
@@ -366,13 +365,13 @@ def get_news():
 
     cfg = news_conn.request_news_config()
     print("News Configuration:")
-    pprint(cfg)
+    print(cfg)
     print("")
 
     print("Latest 10 headlines:")
     headlines = news_conn.request_news_headlines(
         sources=[], symbols=[], date=None, limit=10)
-    pprint(headlines)
+    print(headlines)
     print("")
 
     story_id = headlines[0].story_id
@@ -388,7 +387,7 @@ def get_news():
         symbols=["AAPL", "IBM", "TSLA"],
         bgn_dt=week_ago, end_dt=today)
     print("Number of news stories in last week for AAPL, IBM and TSLA:")
-    pprint(counts)
+    print(counts)
     print("")
 
 
