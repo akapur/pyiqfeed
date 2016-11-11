@@ -82,25 +82,22 @@ class FeedConn:
 
     port = quote_port
 
-    ConnStatsMsg = namedtuple('ConnStatsData',
-                              ('server_ip', 'server_port',
-                               'max_sym', 'num_sym',
-                               'num_clients',
-                               'secs_since_update',
-                               'num_recon', 'num_fail_recon',
-                               'conn_tm', 'mkt_tm',
-                               'status',
-                               'feed_version',
-                               'login',
-                               'kbs_recv', 'kbps_recv', 'avg_kbps_recv',
-                               'kbs_sent', 'kbps_sent', 'avg_kbps_sent'))
+    ConnStatsMsg = namedtuple('ConnStatsData', (
+        'server_ip', 'server_port', 'max_sym', 'num_sym', 'num_clients',
+        'secs_since_update', 'num_recon', 'num_fail_recon', 'conn_tm', 'mkt_tm',
+        'status', 'feed_version', 'login', 'kbs_recv', 'kbps_recv',
+        'avg_kbps_recv',
+        'kbs_sent', 'kbps_sent', 'avg_kbps_sent'))
 
-    TimeStampMsg = namedtuple("TimeStampMsg",
-                              ("date", "time"))
+    TimeStampMsg = namedtuple("TimeStampMsg", ("date", "time"))
 
     def __init__(self, name: str, host: str, port: int):
-        self._stop = False
-        self._started = False
+        self._host = host
+        self._port = port
+        self._name = name
+
+        self._stop = threading.Event()
+        self._start_lock = threading.Lock()
         self._connected = False
         self._reconnect_failed = False
         self._pf_dict = {}
@@ -109,71 +106,51 @@ class FeedConn:
         self._buf_lock = threading.RLock()
         self._send_lock = threading.RLock()
         self._recv_buf = ""
-        self._host = host
-        self._port = port
-        self._name = name
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._read_thread = threading.Thread(group=None, target=self,
                                              name="%s-reader" % self._name,
-                                             args=(),
-                                             kwargs={},
-                                             daemon=None)
+                                             args=(), kwargs={}, daemon=None)
         self._set_message_mappings()
-        self._connect(host, port)
 
-    def __del__(self):
-        self._disconnect()
+    def connect(self) -> None:
+        """
+        Connect to the appropriate socket and start the reading thread.
 
-    def _send_cmd(self, cmd: str) -> None:
-        with self._send_lock:
-            # noinspection PyArgumentEqualDefault
-            self._sock.sendall(cmd.encode(encoding='utf-8', errors='strict'))
+        You must call this before you start using an XXXConn class. If
+        this thread is not running, no callbacks will be called, not data
+        will be returned by functions which return data immediately.
 
-    def _connect(self, host, port) -> None:
-        self._host = host
-        self._port = port
-        self._sock.connect((host, port))
+        """
+        self._sock.connect((self._host, self._port))
         self._set_protocol(FeedConn.protocol)
-        self._set_client_name(self._name)
+        self._set_client_name(self.name())
         self._send_connect_message()
+        self.start_runner()
 
-    def _disconnect(self) -> None:
+    def start_runner(self) -> None:
+        """Called to start the reading thread."""
+        with self._start_lock:
+            self._stop.clear()
+            if not self.reader_running():
+                self._read_thread.start()
+
+    def disconnect(self) -> None:
+        """
+        Stop the reading thread and disconnect from the socket to IQFeed.exe
+
+        Call this to ensure sockets are closed and we exit cleanly.
+
+        """
         self.stop_runner()
         self._sock.shutdown(socket.SHUT_RDWR)
         self._sock.close()
 
-    def start_runner(self) -> None:
-        """
-        Start the thread which reads and processes data sent by IQFeed.exe
-
-        :return: None
-
-        You must call this before you start using an XXXConn class (other
-        than TableConn). If this thread is not running, no callbacks will
-        be called, not data will be returned by functions which return
-        data immediately.
-
-        """
-        self._stop = False
-        if not self._started:
-            self._read_thread.start()
-            self._started = True
-
     def stop_runner(self) -> None:
-        """
-        Stop the thread which reads and processes data sent by IQFeed.exe
-
-        :return: None
-
-        Call this to ensure sockets are closed and we exit cleanly. Not
-        strictly necessary since python GC will eventually clean up but
-        its a good idea to call this anyway.
-
-        """
-        self._stop = True
-        if self._started:
-            self._read_thread.join(30)
-            self._started = False
+        """Called to stop the reading and message processing thread."""
+        with self._start_lock:
+            self._stop.set()
+            if self.reader_running():
+                self._read_thread.join(30)
 
     def reader_running(self) -> bool:
         """
@@ -193,8 +170,20 @@ class FeedConn:
         It may take a few seconds after connecting to IQFeed for IQFeed to tell
         us it is connected to DTN's servers. During these few seconds, this
         function will return False even though it's not actually a problem.
+
+        NOTE: It's not telling you if you are connected to IQFeed.exe. It's
+        telling you if IQFeed.exe is connected to DTN's servers.
         """
         return self._connected
+
+    def name(self) -> str:
+        """Return whatever you named this conn class in the constructor"""
+        return self._name
+
+    def _send_cmd(self, cmd: str) -> None:
+        with self._send_lock:
+            # noinspection PyArgumentEqualDefault
+            self._sock.sendall(cmd.encode(encoding='utf-8', errors='strict'))
 
     def reconnect_failed(self) -> bool:
         """
@@ -210,33 +199,17 @@ class FeedConn:
 
     def __call__(self):
         """The reader thread runs this in a loop."""
-        try:
-            while not self._stop:
-                if self._read_messages():
-                    self._process_messages()
-        finally:
-            self._started = False
-
-    def _set_message_mappings(self) -> None:
-        """Creates map of message names to processing functions."""
-        self._pf_dict['E'] = self._process_error
-        self._pf_dict['T'] = self._process_timestamp
-        self._pf_dict['S'] = self._process_system_message
-
-        self._sm_dict["SERVER DISCONNECTED"] = self._process_server_disconnected
-        self._sm_dict["SERVER CONNECTED"] = self._process_server_connected
-        self._sm_dict[
-            "SERVER RECONNECT FAILED"] = self._process_reconnect_failed
-        self._sm_dict["CURRENT PROTOCOL"] = self._process_current_protocol
-        self._sm_dict["STATS"] = self._process_conn_stats
+        while not self._stop.is_set():
+            if self._read_messages():
+                self._process_messages()
 
     def _read_messages(self) -> bool:
         """Read raw text sent by IQFeed on socket"""
         ready_list = select.select([self._sock], [], [self._sock], 5)
         if ready_list[2]:
             raise RuntimeError(
-                "Error condition on socket connection to IQFeed: %s," %
-                self._name)
+                    "Error condition on socket connection to IQFeed: %s,"
+                    "" % self.name())
         if ready_list[0]:
             data_recvd = self._sock.recv(1024).decode('latin-1')
             with self._buf_lock:
@@ -254,6 +227,20 @@ class FeedConn:
                 return message
             else:
                 return ""
+
+    def _set_message_mappings(self) -> None:
+        """Creates map of message names to processing functions."""
+        self._pf_dict['E'] = self._process_error
+        self._pf_dict['T'] = self._process_timestamp
+        self._pf_dict['S'] = self._process_system_message
+
+        self._sm_dict["SERVER DISCONNECTED"] = \
+            self._process_server_disconnected
+        self._sm_dict["SERVER CONNECTED"] = self._process_server_connected
+        self._sm_dict[
+            "SERVER RECONNECT FAILED"] = self._process_reconnect_failed
+        self._sm_dict["CURRENT PROTOCOL"] = self._process_current_protocol
+        self._sm_dict["STATS"] = self._process_conn_stats
 
     def _process_messages(self) -> None:
         """Process the next complete message waiting to be processed"""
@@ -278,8 +265,8 @@ class FeedConn:
         Appropriate action here is probably to crash.
 
         """
-        err_msg = ("Unexpected message received by %s: %s" %
-                   (self._name, ",".join(fields)))
+        err_msg = ("Unexpected message received by %s: %s" % (
+            self.name(), ",".join(fields)))
         raise UnexpectedMessage(err_msg)
 
     def _process_system_message(self, fields: Sequence[str]) -> None:
@@ -295,8 +282,8 @@ class FeedConn:
         processing_func = self._system_processing_function(fields)
         processing_func(fields)
 
-    def _system_processing_function(self, fields) -> Callable[[Sequence[str]],
-                                                              None]:
+    def _system_processing_function(self, fields) -> Callable[
+            [Sequence[str]], None]:
         """Returns the appropriate system message handling function."""
         assert len(fields) > 1
         assert fields[0] == "S"
@@ -314,8 +301,8 @@ class FeedConn:
         Appropriate action here is probably to crash.
 
         """
-        err_msg = ("Unexpected message received by %s: %s" %
-                   (self._name, ",".join(fields)))
+        err_msg = ("Unexpected message received by %s: %s" % (
+            self.name(), ",".join(fields)))
         raise UnexpectedMessage(err_msg)
 
     def _process_current_protocol(self, fields: Sequence[str]) -> None:
@@ -334,8 +321,8 @@ class FeedConn:
         assert fields[1] == "CURRENT PROTOCOL"
         protocol = fields[2]
         if protocol != FeedConn.protocol:
-            err_msg = ("Desired Protocol %s, Server Says Protocol %s in %s" %
-                       (FeedConn.protocol, protocol, self._name))
+            err_msg = ("Desired Protocol %s, Server Says Protocol %s in %s" % (
+            FeedConn.protocol, protocol, self.name()))
             raise UnexpectedProtocol(err_msg)
 
     def _process_server_disconnected(self, fields: Sequence[str]) -> None:
@@ -373,26 +360,19 @@ class FeedConn:
         assert fields[0] == "S"
         assert fields[1] == "STATS"
         conn_stats = FeedConn.ConnStatsMsg(
-            server_ip=fields[2],
-            server_port=int(fields[3]),
-            max_sym=int(fields[4]),
-            num_sym=int(fields[5]),
-            num_clients=int(fields[6]),
-            secs_since_update=int(fields[7]),
-            num_recon=int(fields[8]),
-            num_fail_recon=int(fields[9]),
-            conn_tm=time.strptime(fields[10], "%b %d %I:%M%p"),
-            mkt_tm=(time.strptime(fields[11], "%b %d %I:%M%p")
-                    if self.connected() else None),
-            status=(fields[12] == "Connected"),
-            feed_version=fields[13],
-            login=fields[14],
-            kbs_recv=float(fields[15]),
-            kbps_recv=float(fields[16]),
-            avg_kbps_recv=float(fields[17]),
-            kbs_sent=float(fields[18]),
-            kbps_sent=float(fields[19]),
-            avg_kbps_sent=float(fields[20]))
+                server_ip=fields[2],
+                server_port=int(fields[3]), max_sym=int(fields[4]),
+                num_sym=int(fields[5]), num_clients=int(fields[6]),
+                secs_since_update=int(fields[7]), num_recon=int(fields[8]),
+                num_fail_recon=int(fields[9]),
+                conn_tm=time.strptime(fields[10], "%b %d %I:%M%p"), mkt_tm=(
+                    time.strptime(fields[11],
+                        "%b %d %I:%M%p") if self.connected() else None),
+                status=(fields[12] == "Connected"), feed_version=fields[13],
+                login=fields[14], kbs_recv=float(fields[15]),
+                kbps_recv=float(fields[16]), avg_kbps_recv=float(fields[17]),
+                kbs_sent=float(fields[18]), kbps_sent=float(fields[19]),
+                avg_kbps_sent=float(fields[20]))
         for listener in self._listeners:
             listener.process_conn_stats(conn_stats)
 
@@ -520,8 +500,7 @@ class QuoteConn(FeedConn):
     port = FeedConn.quote_port
 
     # Type of numpy structured array used to return regional quotes.
-    regional_type = np.dtype([('Symbol', 'S64'),
-                              ('Regional Bid', 'f8'),
+    regional_type = np.dtype([('Symbol', 'S64'), ('Regional Bid', 'f8'),
                               ('Regional BidSize', 'u8'),
                               ('Regional BidTime', 'u8'),
                               ('Regional Ask', 'f8'),
@@ -533,52 +512,43 @@ class QuoteConn(FeedConn):
 
     # List of fields provided by IQFeed.exe in the fundamentals message.
     fundamental_fields = ["Symbol", "Exchange ID", "PE", "Average Volume",
-                          "52 Week High", "52 Week Low",
-                          "Calendar Year High", "Calendar Year Low",
-                          "Dividend Yield", "Dividend Amount", "Dividend Rate",
-                          "Pay Date", "Ex-dividend Date",
-                          "(Reserved)", "(Reserved)", "(Reserved)",
-                          "Short Interest", "(Reserved)",
+                          "52 Week High", "52 Week Low", "Calendar Year High",
+                          "Calendar Year Low", "Dividend Yield",
+                          "Dividend Amount", "Dividend Rate", "Pay Date",
+                          "Ex-dividend Date", "(Reserved)", "(Reserved)",
+                          "(Reserved)", "Short Interest", "(Reserved)",
                           "Current Year EPS", "Next Year EPS",
                           "Five-year Growth Percentage", "Fiscal Year End",
-                          "(Reserved)", "Company Name",
-                          "Root Option Symbol", "Percent Held By Institutions",
-                          "Beta", "Leaps",
+                          "(Reserved)", "Company Name", "Root Option Symbol",
+                          "Percent Held By Institutions", "Beta", "Leaps",
                           "Current Assets", "Current Liabilities",
                           "Balance Sheet Date", "Long-term Debt",
                           "Common Shares Outstanding", "(Reserved)",
-                          "Split Factor 1", "Split Factor 2",
-                          "(Reserved)", "Market Center", "Format Code",
-                          "Precision", "SIC",
+                          "Split Factor 1", "Split Factor 2", "(Reserved)",
+                          "Market Center", "Format Code", "Precision", "SIC",
                           "Historical Volatility", "Security Type",
-                          "Listed Market",
-                          "52 Week High Date", "52 Week Low Date",
-                          "Calendar Year High Date", "Calendar Year Low Date",
-                          "Year End Close", "Maturity Date", "Coupon Rate",
-                          "Expiration Date",
+                          "Listed Market", "52 Week High Date",
+                          "52 Week Low Date", "Calendar Year High Date",
+                          "Calendar Year Low Date", "Year End Close",
+                          "Maturity Date", "Coupon Rate", "Expiration Date",
                           "Strike Price", "NAICS", "Exchange Root",
                           "Option Premium Multiplier",
                           "Option Multiple Deliverable"]
 
     # Type of numpy structured array used to return fundamental data.
-    fundamental_type = [('Symbol', 'S128'),
-                        ('PE', 'f8'),
-                        ('Average Volume', 'f8'),
-                        ('52 Week High', 'f8'), ('52 Week Low', 'f8'),
-                        ('Calendar Year High', 'f8'),
-                        ('Calendar Year Low', 'f8'),
-                        ('Dividend Yield', 'f8'), ('Dividend Amount', 'f8'),
-                        ('Dividend Rate', 'f8'),
+    fundamental_type = [('Symbol', 'S128'), ('PE', 'f8'),
+                        ('Average Volume', 'f8'), ('52 Week High', 'f8'),
+                        ('52 Week Low', 'f8'), ('Calendar Year High', 'f8'),
+                        ('Calendar Year Low', 'f8'), ('Dividend Yield', 'f8'),
+                        ('Dividend Amount', 'f8'), ('Dividend Rate', 'f8'),
                         ('Pay Date', 'M8[D]'), ('Ex-dividend Date', 'M8[D]'),
-                        ('Short Interest', 'i8'),
-                        ('Current Year EPS', 'f8'), ('Next Year EPS', 'f8'),
+                        ('Short Interest', 'i8'), ('Current Year EPS', 'f8'),
+                        ('Next Year EPS', 'f8'),
                         ('Five-year Growth Percentage', 'f8'),
-                        ('Fiscal Year End', 'u1'),
-                        ('Company Name', 'S256'),
+                        ('Fiscal Year End', 'u1'), ('Company Name', 'S256'),
                         ('Root Option Symbol', 'S256'),
-                        ('Percent Held By Institutions', 'f8'),
-                        ('Beta', 'f8'), ('Leaps', 'S128'),
-                        ('Current Assets', 'f8'),
+                        ('Percent Held By Institutions', 'f8'), ('Beta', 'f8'),
+                        ('Leaps', 'S128'), ('Current Assets', 'f8'),
                         ('Current Liabilities', 'f8'),
                         ('Balance Sheet Date', 'M8[D]'),
                         ('Long-term Debt', 'f8'),
@@ -586,9 +556,8 @@ class QuoteConn(FeedConn):
                         ('Split Factor 1 Date', 'M8[D]'),
                         ('Split Factor 1', 'f8'),
                         ('Split Factor 2 Date', 'M8[D]'),
-                        ('Split Factor 2', 'f8'),
-                        ('Format Code', 'u1'), ('Precision', 'u1'),
-                        ('SIC', 'u8'),
+                        ('Split Factor 2', 'f8'), ('Format Code', 'u1'),
+                        ('Precision', 'u1'), ('SIC', 'u8'),
                         ('Historical Volatility', 'f8'),
                         ('Security Type', 'u1'), ('Listed Market', 'u1'),
                         ('52 Week High Date', 'M8[D]'),
@@ -597,8 +566,7 @@ class QuoteConn(FeedConn):
                         ('Calendar Year Low Date', 'M8[D]'),
                         ('Year End Close', 'f8'), ('Maturity Date', 'M8[D]'),
                         ('Coupon Rate', 'f8'), ('Expiration Date', 'M8[D]'),
-                        ('Strike Price', 'f8'),
-                        ('NAICS', 'u8'),
+                        ('Strike Price', 'f8'), ('NAICS', 'u8'),
                         ('Exchange Root', 'S128'),
                         ('Option Premium Multiplier', 'f8'),
                         ('Option Multiple Deliverable', 'u8')]
@@ -616,150 +584,237 @@ class QuoteConn(FeedConn):
     # instances of QuoteConn. Use one for all stock subscriptions and one for
     # all options subscriptions. They can both update the same listener if
     # that is what you want.
-    quote_msg_map = {'Symbol': ('Symbol', 'S128', lambda x: x),
-                     '7 Day Yield': ('7 Day Yield', 'f8', fr.read_float64),
-                     'Ask': ('Ask', 'f8', fr.read_float64),
-                     'Ask Change': ('Ask Change', 'f8', fr.read_float64),
-                     'Ask Market Center':
-                         ('Ask Market Center', 'u1', fr.read_uint8),
-                     'Ask Size': ('Ask Size', 'u8', fr.read_uint64),
-                     'Ask Time': ('Ask Time', 'u8', fr.read_hhmmssmil),
+    quote_msg_map = {'Symbol'
+    : (
+    'Symbol', 'S128', lambda x: x),
+                     '7 Day Yield'
+                     : (
+                     '7 Day Yield', 'f8', fr.read_float64),
+                     'Ask'
+                     : (
+                     'Ask', 'f8', fr.read_float64),
+                     'Ask Change'
+                     : (
+                     'Ask Change', 'f8', fr.read_float64),
+                     'Ask Market Center'
+                     : (
+                     'Ask Market Center', 'u1', fr.read_uint8),
+                     'Ask Size'
+                     : (
+                     'Ask Size', 'u8', fr.read_uint64),
+                     'Ask Time'
+                     : (
+                     'Ask Time', 'u8', fr.read_hhmmssmil), # TODO: Parse:
+                     'Available Regions'
+                     : (
+                     'Available Regions', 'S128', lambda x: x),
+                     'Average Maturity'
+                     : (
+                     'Average Maturity', 'f8', fr.read_float64),
+                     'Bid'
+                     : (
+                     'Bid', 'f8', fr.read_float64),
+                     'Bid Change'
+                     : (
+                     'Bid Change', 'f8', fr.read_float64),
+                     'Bid Market Center'
+                     : (
+                     'Bid Market Center', 'u1', fr.read_uint8),
+                     'Bid Size'
+                     : (
+                     'Bid Size', 'u8', fr.read_uint64),
+                     'Bid Time'
+                     : (
+                     'Bid Time', 'u8', fr.read_hhmmssmil),
+                     'Change'
+                     : (
+                     'Change', 'f8', fr.read_float64),
+                     'Change From Open'
+                     : (
+                     'Change From Open', 'f8', fr.read_float64),
+                     'Close'
+                     : (
+                     'Close', 'f8', fr.read_float64),
+                     'Close Range 1'
+                     : (
+                     'Close Range 1', 'f8', fr.read_float64),
+                     'Close Range 2'
+                     : (
+                     'Close Range 2', 'f8', fr.read_float64),
+                     'Days to Expiration'
+                     : (
+                     'Days to Expiration', 'u2', fr.read_uint16),
+                     'Decimal Precision'
+                     : (
+                     'Decimal Precision', 'u1', fr.read_uint8),
+                     'Delay'
+                     : (
+                     'Delay', 'u1', fr.read_uint8),
+                     'Exchange ID'
+                     : (
+                     'Exchange ID', 'u1', fr.read_hex),
+                     'Extended Trade'
+                     : (
+                     'Extended Price', 'f8', fr.read_float64),
+                     'Extended Trade Date'
+                     : (
+                     'Extended Trade Date', 'M8[D]', fr.read_mmddccyy),
+                     'Extended Trade Market Center'
+                     : (
+                     'Extended Trade Market Center', 'u1', fr.read_uint8),
+                     'Extended Trade Size'
+                     : (
+                     'Extended Trade Size', 'u8', fr.read_uint64),
+                     'Extended Trade Time'
+                     : (
+                     'Extended Trade Time', 'u8', fr.read_hhmmssmil),
+                     'Extended Trading Change'
+                     : (
+                     'Extended Trading Change', 'f8', fr.read_float64),
+                     'Extended Trading Difference'
+                     : (
+                     'Extended Trading Difference', 'f8', fr.read_float64),
                      # TODO: Parse:
-                     'Available Regions':
-                         ('Available Regions', 'S128', lambda x: x),
-                     'Average Maturity':
-                         ('Average Maturity', 'f8', fr.read_float64),
-                     'Bid': ('Bid', 'f8', fr.read_float64),
-                     'Bid Change': ('Bid Change', 'f8', fr.read_float64),
-                     'Bid Market Center':
-                         ('Bid Market Center', 'u1', fr.read_uint8),
-                     'Bid Size': ('Bid Size', 'u8', fr.read_uint64),
-                     'Bid Time': ('Bid Time', 'u8', fr.read_hhmmssmil),
-                     'Change': ('Change', 'f8', fr.read_float64),
-                     'Change From Open':
-                         ('Change From Open', 'f8', fr.read_float64),
-                     'Close': ('Close', 'f8', fr.read_float64),
-                     'Close Range 1': ('Close Range 1', 'f8', fr.read_float64),
-                     'Close Range 2': ('Close Range 2', 'f8', fr.read_float64),
-                     'Days to Expiration':
-                         ('Days to Expiration', 'u2', fr.read_uint16),
-                     'Decimal Precision':
-                         ('Decimal Precision', 'u1', fr.read_uint8),
-                     'Delay': ('Delay', 'u1', fr.read_uint8),
-                     'Exchange ID': ('Exchange ID', 'u1', fr.read_hex),
-                     'Extended Trade': ('Extended Price', 'f8',
-                                        fr.read_float64),
-                     'Extended Trade Date':
-                         ('Extended Trade Date', 'M8[D]', fr.read_mmddccyy),
-                     'Extended Trade Market Center':
-                         ('Extended Trade Market Center', 'u1', fr.read_uint8),
-                     'Extended Trade Size':
-                         ('Extended Trade Size', 'u8', fr.read_uint64),
-                     'Extended Trade Time':
-                         ('Extended Trade Time', 'u8', fr.read_hhmmssmil),
-                     'Extended Trading Change':
-                         ('Extended Trading Change', 'f8', fr.read_float64),
-                     'Extended Trading Difference':
-                         ('Extended Trading Difference', 'f8', fr.read_float64),
+                     'Financial Status Indicator'
+                     : (
+                     'Financial Status Indicator', 'S1', lambda x: x),
+                     'Fraction Display Code'
+                     : (
+                     'Fraction Display Code', 'u1', fr.read_uint8),
+                     'High'
+                     : (
+                     'High', 'f8', fr.read_float64),
+                     'Last'
+                     : (
+                     'Last', 'f8', fr.read_float64),
+                     'Last Date'
+                     : (
+                     'Last Date', 'M8[D]', fr.read_mmddccyy),
+                     'Last Market Center'
+                     : (
+                     'Last Market Center', 'u1', fr.read_uint8),
+                     'Last Size'
+                     : (
+                     'Last Size', 'u8', fr.read_uint64),
+                     'Last Time'
+                     : (
+                     'Last Time', 'u8', fr.read_hhmmssmil),
+                     'Low'
+                     : (
+                     'Low', 'f8', fr.read_float64),
+                     'Market Capitalization'
+                     : (
+                     'Market Capitalization', 'f8', fr.read_float64),
+                     'Market Open'
+                     : (
+                     'Market Open', 'b1', fr.read_is_market_open),
                      # TODO: Parse:
-                     'Financial Status Indicator':
-                         ('Financial Status Indicator', 'S1', lambda x: x),
-                     'Fraction Display Code':
-                         ('Fraction Display Code', 'u1', fr.read_uint8),
-                     'High': ('High', 'f8', fr.read_float64),
-                     'Last': ('Last', 'f8', fr.read_float64),
-                     'Last Date': ('Last Date', 'M8[D]', fr.read_mmddccyy),
-                     'Last Market Center':
-                         ('Last Market Center', 'u1', fr.read_uint8),
-                     'Last Size': ('Last Size', 'u8', fr.read_uint64),
-                     'Last Time': ('Last Time', 'u8', fr.read_hhmmssmil),
-                     'Low': ('Low', 'f8', fr.read_float64),
-                     'Market Capitalization':
-                         ('Market Capitalization', 'f8', fr.read_float64),
-                     'Market Open': ('Market Open', 'b1',
-                                     fr.read_is_market_open),
-                     # TODO: Parse:
-                     'Message Contents':
-                         ('Message Contents', 'S9', lambda x: x),
-                     'Most Recent Trade':
-                         ('Most Recent Trade', 'f8', fr.read_float64),
-                     # TODO: Parse:
-                     'Most Recent Trade Conditions':
-                         ('Most Recent Trade Conditions', 'S16', lambda x: x),
-                     'Most Recent Trade Date':
-                         ('Most Recent Trade Date', 'M8[D]', fr.read_mmddccyy),
-                     'Most Recent Trade Market Center':
-                         ('Most Recent Trade Market Center', 'u1',
-                          fr.read_uint8),
-                     'Most Recent Trade Size':
-                         ('Most Recent Trade Size', 'u8',
-                          fr.read_uint64),
-                     'Most Recent Trade Time':
-                         ('Most Recent Trade Time', 'u8',
-                          fr.read_hhmmssmil),
-                     'Net Asset Value': ('Net Asset Value', 'f8',
-                                         fr.read_float64),
-                     'Number of Trades Today':
-                         ('Number of Trades Today', 'u8', fr.read_uint64),
-                     'Open': ('Open', 'f8', fr.read_float64),
-                     'Open Interest': ('Open Interest', 'u8', fr.read_uint64),
-                     'Open Range 1': ('Open Range 1', 'f8', fr.read_float64),
-                     'Open Range 2': ('Open Range 2', 'f8', fr.read_float64),
-                     'Percent Change': ('Percent Change', 'f8',
-                                        fr.read_float64),
-                     'Percent Off Average Volume':
-                         ('Percent Off Average Volume', 'f8', fr.read_float64),
-                     'Previous Day Volume':
-                         ('Previous Day Volume', 'u8', fr.read_uint64),
-                     'Price-Earnings Ratio':
-                         ('Price-Earnings Ratio', 'f8', fr.read_float64),
-                     'Range': ('Range', 'f8', fr.read_float64),
-                     'Restricted Code':
-                         ('Restricted Code', 'b1',
-                          fr.read_is_short_restricted),
-                     'Settle': ('Settle', 'f8', fr.read_float64),
-                     'Settlement Date':
-                         ('Settlement Date', 'M8[D]', fr.read_mmddccyy),
-                     'Spread': ('Spread', 'f8', fr.read_float64),
-                     'Tick': ('Tick', 'i8', fr.read_tick_direction),
-                     'TickID': ('TickId', 'u8', fr.read_uint64),
-                     'Total Volume': ('Total Volume', 'u8', fr.read_uint64),
-                     'Volatility': ('Volatility', 'f8', fr.read_float64),
-                     'VWAP': ('VWAP', 'f8', fr.read_float64)}
+                     'Message Contents'
+                     : (
+                     'Message Contents', 'S9', lambda x: x),
+                     'Most Recent Trade'
+                     : (
+                     'Most Recent Trade', 'f8', fr.read_float64),
+                     'Most Recent Trade Conditions'
+                     : (
+                     'Most Recent Trade Conditions', 'S16', lambda x: x),
+                     # todo: Parse
+                     'Most Recent Trade Date'
+                     : (
+                     'Most Recent Trade Date', 'M8[D]', fr.read_mmddccyy),
+                     'Most Recent Trade Market Center'
+                     : (
+                     'Most Recent Trade Market Center', 'u1', fr.read_uint8),
+                     'Most Recent Trade Size'
+                     : (
+                     'Most Recent Trade Size', 'u8', fr.read_uint64),
+                     'Most Recent Trade Time'
+                     : (
+                     'Most Recent Trade Time', 'u8', fr.read_hhmmssmil),
+                     'Net Asset Value'
+                     : (
+                     'Net Asset Value', 'f8', fr.read_float64),
+                     'Number of Trades Today'
+                     : (
+                     'Number of Trades Today', 'u8', fr.read_uint64),
+                     'Open'
+                     : (
+                     'Open', 'f8', fr.read_float64),
+                     'Open Interest'
+                     : (
+                     'Open Interest', 'u8', fr.read_uint64),
+                     'Open Range 1'
+                     : (
+                     'Open Range 1', 'f8', fr.read_float64),
+                     'Open Range 2'
+                     : (
+                     'Open Range 2', 'f8', fr.read_float64),
+                     'Percent Change'
+                     : (
+                     'Percent Change', 'f8', fr.read_float64),
+                     'Percent Off Average Volume'
+                     : (
+                     'Percent Off Average Volume', 'f8', fr.read_float64),
+                     'Previous Day Volume'
+                     : (
+                     'Previous Day Volume', 'u8', fr.read_uint64),
+                     'Price-Earnings Ratio'
+                     : (
+                     'Price-Earnings Ratio', 'f8', fr.read_float64),
+                     'Range'
+                     : (
+                     'Range', 'f8', fr.read_float64),
+                     'Restricted Code'
+                     : (
+                     'Restricted Code', 'b1', fr.read_is_short_restricted),
+                     'Settle'
+                     : (
+                     'Settle', 'f8', fr.read_float64),
+                     'Settlement Date'
+                     : (
+                     'Settlement Date', 'M8[D]', fr.read_mmddccyy),
+                     'Spread'
+                     : (
+                     'Spread', 'f8', fr.read_float64),
+                     'Tick'
+                     : (
+                     'Tick', 'i8', fr.read_tick_direction),
+                     'TickID'
+                     : (
+                     'TickId', 'u8', fr.read_uint64),
+                     'Total Volume'
+                     : (
+                     'Total Volume', 'u8', fr.read_uint64),
+                     'Volatility'
+                     : (
+                     'Volatility', 'f8', fr.read_float64),
+                     'VWAP'
+                     : (
+                     'VWAP', 'f8', fr.read_float64)}
 
-    NewsMsg = namedtuple("NewsMsg",
-                         ("story_id",
-                          "distributor",
-                          "symbol_list",
-                          "story_time",
-                          "headline"))
+    NewsMsg = namedtuple("NewsMsg", (
+        "story_id", "distributor", "symbol_list", "story_time", "headline"))
 
-    CustomerInfoMsg = namedtuple("CustomerInfoMsg",
-                                 ("svc_type",
-                                  "ip_address", "port",
-                                  "token",
-                                  "version",
-                                  "rt_exchanges",
-                                  "max_symbols",
-                                  "flags"))
+    CustomerInfoMsg = namedtuple("CustomerInfoMsg", (
+        "svc_type", "ip_address", "port", "token", "version", "rt_exchanges",
+        "max_symbols", "flags"))
 
-    def __init__(self, name: str="QuoteConn", host: str=FeedConn.host,
-                 port: int=port):
+    def __init__(self, name: str = "QuoteConn", host: str = FeedConn.host,
+                 port: int = port):
         super().__init__(name, host, port)
         self._current_update_fields = []
         self._update_names = []
         self._update_dtype = []
         self._update_reader = []
         self._set_message_mappings()
-        self._current_update_fields = ["Symbol",
-                                       "Most Recent Trade",
+        self._current_update_fields = ["Symbol", "Most Recent Trade",
                                        "Most Recent Trade Size",
                                        "Most Recent Trade Time",
                                        "Most Recent Trade Market Center",
-                                       "Total Volume",
-                                       "Bid", "Bid Size", "Ask", "Ask Size",
-                                       "Open", "High", "Low", "Close",
-                                       "Message Contents",
+                                       "Total Volume", "Bid", "Bid Size",
+                                       "Ask",
+                                       "Ask Size", "Open", "High", "Low",
+                                       "Close", "Message Contents",
                                        "Most Recent Trade Conditions"]
         self._num_update_fields = len(self._current_update_fields)
         self._set_current_update_structs(self._current_update_fields)
@@ -768,7 +823,7 @@ class QuoteConn(FeedConn):
         self._request_current_update_fieldnames()
 
         self._empty_fundamental_msg = np.zeros(
-            1, dtype=QuoteConn.fundamental_type)
+                1, dtype=QuoteConn.fundamental_type)
         self._empty_regional_msg = np.zeros(1, dtype=QuoteConn.regional_type)
 
     def _set_message_mappings(self) -> None:
@@ -785,16 +840,15 @@ class QuoteConn(FeedConn):
         self._sm_dict["KEYOK"] = self._process_keyok
         self._sm_dict["CUST"] = self._process_customer_info
         self._sm_dict["WATCHES"] = self._process_watches
-        self._sm_dict["CURRENT LOG LEVELS"] = \
-            self._process_current_log_levels
-        self._sm_dict["SYMBOL LIMIT REACHED"] =\
-            self._process_symbol_limit_reached
+        self._sm_dict["CURRENT LOG LEVELS"] = self._process_current_log_levels
+        self._sm_dict[
+            "SYMBOL LIMIT REACHED"] = self._process_symbol_limit_reached
         self._sm_dict["IP"] = self._process_ip_addresses_used
-        self._sm_dict["FUNDAMENTAL FIELDNAMES"] =\
-            self._process_fundamental_fieldnames
-        self._sm_dict["UPDATE FIELDNAMES"] =\
-            self._process_update_fieldnames
-        self._sm_dict["CURRENT UPDATE FIELDNAMES"] =\
+        self._sm_dict[
+            "FUNDAMENTAL FIELDNAMES"] = self._process_fundamental_fieldnames
+        self._sm_dict["UPDATE FIELDNAMES"] = self._process_update_fieldnames
+        self._sm_dict[
+            "CURRENT UPDATE FIELDNAMES"] = \
             self._process_current_update_fieldnames
 
     def _process_invalid_symbol(self, fields: Sequence[str]) -> None:
@@ -815,11 +869,11 @@ class QuoteConn(FeedConn):
         story_time = fr.read_live_news_timestamp(fields[4])
         headline = fields[5]
         news = QuoteConn.NewsMsg(
-            story_id=story_id,
-            distributor=distributor,
-            symbol_list=symbol_list,
-            story_time=story_time,
-            headline=headline)
+                story_id=story_id,
+                distributor=distributor,
+                symbol_list=symbol_list,
+                story_time=story_time,
+                headline=headline)
         for listener in self._listeners:
             listener.process_news(news)
 
@@ -863,8 +917,8 @@ class QuoteConn(FeedConn):
         for field_num, field in enumerate(fields[1:]):
             if field_num >= self._num_update_fields and field == "":
                 break
-            update[self._update_names[field_num]] =\
-                self._update_reader[field_num](field)
+            update[self._update_names[field_num]] = self._update_reader[
+                field_num](field)
         return update
 
     def _process_fundamentals(self, fields: Sequence[str]):
@@ -891,12 +945,10 @@ class QuoteConn(FeedConn):
         msg['Five-year Growth Percentage'] = fr.read_float64(fields[21])
         msg['Fiscal Year End'] = fr.read_uint8(fields[22])
         msg['Company Name'] = fields[24]
-        # TODO:Parse:
-        msg['Root Option Symbol'] = fields[25]
+        msg['Root Option Symbol'] = fields[25]  # todo:Parse
         msg['Percent Held By Institutions'] = fr.read_float64(fields[26])
         msg['Beta'] = fr.read_float64(fields[27])
-        # TODO: Parse:
-        msg['Leaps'] = fields[28]
+        msg['Leaps'] = fields[28]  # todo: Parse
         msg['Current Assets'] = fr.read_float64(fields[29])
         msg['Current Liabilities'] = fr.read_float64(fields[30])
         msg['Balance Sheet Date'] = fr.read_mmddccyy(fields[31])
@@ -953,20 +1005,16 @@ class QuoteConn(FeedConn):
         assert fields[0] == 'S'
         assert fields[1] == "CUST"
         cust_info = QuoteConn.CustomerInfoMsg(
-            svc_type=(fields[2] == "real_time"),
-            ip_address=fields[3],
-            port=int(fields[4]),
-            token=fields[5],
-            version=fields[6],
-            rt_exchanges=fields[8].split(" "),
-            max_symbols=int(fields[10]),
-            flags=fields[11])
+                svc_type=(fields[2] == "real_time"), ip_address=fields[3],
+                port=int(fields[4]), token=fields[5], version=fields[6],
+                rt_exchanges=fields[8].split(" "), max_symbols=int(fields[10]),
+                flags=fields[11])
         for listener in self._listeners:
             listener.process_customer_info(cust_info)
 
     def _process_watches(self, fields: Sequence[str]) -> None:
         """Handle a watches message."""
-        assert len(fields) >= 2
+        assert len(fields) > 1
         assert fields[0] == 'S'
         assert fields[1] == "WATCHES"
         for listener in self._listeners:
@@ -974,7 +1022,7 @@ class QuoteConn(FeedConn):
 
     def _process_current_log_levels(self, fields: Sequence[str]) -> None:
         """Called when IQFeed acknowledges log levels have changed"""
-        assert len(fields) >= 2
+        assert len(fields) > 1
         assert fields[0] == 'S'
         assert fields[1] == "CURRENT LOG LEVELS"
         for listener in self._listeners:
@@ -1005,13 +1053,13 @@ class QuoteConn(FeedConn):
         assert fields[1] == 'FUNDAMENTAL FIELDNAMES'
         for field in fields[2:]:
             if field not in QuoteConn.fundamental_fields:
-                err_msg = ("%s not found in dtn_fundamental_fields in %s" %
-                           (field, self._name))
+                err_msg = ("%s not found in dtn_fundamental_fields in %s" % (
+                field, self.name()))
                 raise UnexpectedField(err_msg)
         for field in QuoteConn.fundamental_fields:
             if field not in fields[2:]:
-                err_msg = ("%s not found in FUNDAMENTAL FIELDNAMES in %s" %
-                           (field, self._name))
+                err_msg = ("%s not found in FUNDAMENTAL FIELDNAMES in %s" % (
+                field, self.name()))
                 raise UnexpectedField(err_msg)
 
     def _process_update_fieldnames(self, fields: Sequence[str]) -> None:
@@ -1027,16 +1075,18 @@ class QuoteConn(FeedConn):
         assert fields[1] == 'UPDATE FIELDNAMES'
         for field in fields[2:]:
             if field not in QuoteConn.quote_msg_map:
-                err_msg = ("%s not found in dtn_update_map in %s" %
-                           (field, self._name))
+                err_msg = (
+                "%s not found in dtn_update_map in %s" % (field, self.name()))
                 raise UnexpectedField(err_msg)
         for field in QuoteConn.quote_msg_map:
             if field not in fields[2:]:
-                err_msg = ("%s not found in UPDATE FIELDNAMES in %s" %
-                           (field, self._name))
+                err_msg = (
+                    "%s not found in UPDATE FIELDNAMES in %s" %
+                    (field, self.name()))
                 raise UnexpectedField(err_msg)
 
-    def _process_current_update_fieldnames(self, fields: Sequence[str]) -> None:
+    def _process_current_update_fieldnames(self, fields: Sequence[str]) -> \
+            None:
         """
         IQFeed has accepted our update fieldnames request.
 
@@ -1086,19 +1136,19 @@ class QuoteConn(FeedConn):
         num_update_fields = len(fields)
         new_update_fields = list(itertools.repeat("", num_update_fields))
         new_update_names = new_update_fields
-        new_update_dtypes = list(itertools.repeat(("no_name", 'i8'),
-                                                  num_update_fields))
-        new_update_reader = list(itertools.repeat(
-            lambda x: x, num_update_fields))
+        new_update_dtypes = list(
+            itertools.repeat(("no_name", 'i8'), num_update_fields))
+        new_update_reader = list(
+                itertools.repeat(lambda x: x, num_update_fields))
         for field_num, field in enumerate(fields):
             if field not in QuoteConn.quote_msg_map:
-                raise RuntimeError(
-                    "%s not in QuoteConn.dtn_update_map" % field)
+                raise RuntimeError("%s not in QuoteConn.dtn_update_map" %
+                                   field)
             new_update_fields[field_num] = field
             dtn_update_tup = QuoteConn.quote_msg_map[field]
             new_update_names[field_num] = dtn_update_tup[0]
-            new_update_dtypes[field_num] = (dtn_update_tup[0],
-                                            dtn_update_tup[1])
+            new_update_dtypes[field_num] = (
+            dtn_update_tup[0], dtn_update_tup[1])
             new_update_reader[field_num] = dtn_update_tup[2]
         self._current_update_fields = new_update_fields
         self._update_names = new_update_names
@@ -1159,8 +1209,9 @@ class QuoteConn(FeedConn):
         else:
             symbol_idx = field_names.index("Symbol")
             if symbol_idx != 0:
-                field_names[0], field_names[symbol_idx] =\
-                    field_names[symbol_idx], field_names[0]
+                field_names[0], field_names[symbol_idx] = field_names[
+                                                              symbol_idx], \
+                                                          field_names[0]
         self._send_cmd("S,SELECT UPDATE FIELDS,%s\r\n" % ",".join(field_names))
 
     def req_timestamp(self) -> None:
@@ -1372,30 +1423,30 @@ class AdminConn(FeedConn):
     port = FeedConn.admin_port
     host = FeedConn.host
 
-    ClientStatsMsg = namedtuple("ClientStatsMsg",
-                                ("client_type", "client_id", "client_name",
-                                 "start_dt", "start_tm",
-                                 "kb_sent", "kb_recvd", "kb_queued",
-                                 "num_quote_subs", "num_reg_subs",
-                                 "num_depth_subs"))
+    ClientStatsMsg = namedtuple("ClientStatsMsg", (
+    "client_type", "client_id", "client_name", "start_dt", "start_tm",
+    "kb_sent", "kb_recvd", "kb_queued", "num_quote_subs", "num_reg_subs",
+    "num_depth_subs"))
 
-    def __init__(self, name: str="AdminConn",
-                 host: str=host, port: int=port):
+    def __init__(self, name: str = "AdminConn", host: str = host,
+                 port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
 
     def _set_message_mappings(self) -> None:
         """Set message mappings."""
         super()._set_message_mappings()
-        self._sm_dict["REGISTER CLIENT APP COMPLETED"] =\
+        self._sm_dict[
+            "REGISTER CLIENT APP COMPLETED"] = \
             self._process_register_client_app_completed
-        self._sm_dict["REMOVE CLIENT APP COMPLETED"] =\
+        self._sm_dict[
+            "REMOVE CLIENT APP COMPLETED"] = \
             self._process_remove_client_app_completed
         self._sm_dict["CURRENT LOGINID"] = self._process_current_login
         self._sm_dict["CURRENT PASSWORD"] = self._process_current_password
         self._sm_dict["LOGIN INFO SAVED"] = self._process_login_info_saved
-        self._sm_dict["LOGIN INFO NOT SAVED"] =\
-            self._process_login_info_not_saved
+        self._sm_dict[
+            "LOGIN INFO NOT SAVED"] = self._process_login_info_not_saved
         self._sm_dict["AUTOCONNECT ON"] = self._process_autoconnect_on
         self._sm_dict["AUTOCONNECT OFF"] = self._process_autoconnect_off
         self._sm_dict["CLIENTSTATS"] = self._process_client_stats
@@ -1511,18 +1562,12 @@ class AdminConn(FeedConn):
         elif 2 == type_int:
             num_depth_subs = num_sym
 
-        client_stats = AdminConn.ClientStatsMsg(
-            client_type=client_type,
-            client_id=client_id,
-            client_name=client_name,
-            start_dt=start_dt,
-            start_tm=start_tm,
-            kb_sent=kb_sent,
-            kb_recvd=kb_recvd,
-            kb_queued=kb_queued,
-            num_quote_subs=num_quote_subs,
-            num_reg_subs=num_reg_subs,
-            num_depth_subs=num_depth_subs)
+        client_stats = AdminConn.ClientStatsMsg(client_type=client_type,
+                client_id=client_id, client_name=client_name,
+                                                start_dt=start_dt,
+                start_tm=start_tm, kb_sent=kb_sent, kb_recvd=kb_recvd,
+                kb_queued=kb_queued, num_quote_subs=num_quote_subs,
+                num_reg_subs=num_reg_subs, num_depth_subs=num_depth_subs)
         for listener in self._listeners:
             listener.process_client_stats(client_stats)
 
@@ -1635,12 +1680,9 @@ class AdminConn(FeedConn):
         """Turn off client statistics."""
         self._send_cmd("S,CLIENTSTATS OFF\r\n")
 
-    def set_admin_variables(self,
-                            product: str,
-                            login: str,
-                            password: str,
-                            autoconnect: bool=True,
-                            save_info: bool=True) -> None:
+    def set_admin_variables(self, product: str, login: str, password: str,
+                            autoconnect: bool = True,
+                            save_info: bool = True) -> None:
         """Set the administrative variables."""
         self.register_client_app(product)
         self.set_login(login)
@@ -1671,48 +1713,32 @@ class HistoryConn(FeedConn):
     # Tick data is returned as a numpy array of this dtype. Note that
     # "tick-data" in IQFeed parlance means every trade with the latest top of
     # book quote at the time of the trade, NOT every quote and every trade.
-    tick_type = np.dtype([('tick_id', 'u8'),
-                          ('date', 'M8[D]'),
-                          ('time', 'u8'),
-                          ('last', 'f8'),
-                          ('last_sz', 'u8'),
-                          ('last_type', 'S1'),
-                          ('mkt_ctr', 'u4'),
-                          ('tot_vlm', 'u8'),
-                          ('bid', 'f8'),
-                          ('ask', 'f8'),
-                          ('cond1', 'u1'),
-                          ('cond2', 'u1'),
-                          ('cond3', 'u1'),
+    tick_type = np.dtype([('tick_id', 'u8'), ('date', 'M8[D]'), ('time', 'u8'),
+                          ('last', 'f8'), ('last_sz', 'u8'),
+                          ('last_type', 'S1'), ('mkt_ctr', 'u4'),
+                          ('tot_vlm', 'u8'), ('bid', 'f8'), ('ask', 'f8'),
+                          ('cond1', 'u1'), ('cond2', 'u1'), ('cond3', 'u1'),
                           ('cond4', 'u1')])
 
     # Bar data is returned as a numpy array of this type.
-    bar_type = np.dtype([('date', 'M8[D]'),
-                         ('time', 'u8'),
-                         ('open_p', 'f8'),
-                         ('high_p', 'f8'),
-                         ('low_p', 'f8'),
-                         ('close_p', 'f8'),
-                         ('tot_vlm', 'u8'),
-                         ('prd_vlm', 'u8'),
+    bar_type = np.dtype([('date', 'M8[D]'), ('time', 'u8'), ('open_p', 'f8'),
+                         ('high_p', 'f8'), ('low_p', 'f8'), ('close_p', 'f8'),
+                         ('tot_vlm', 'u8'), ('prd_vlm', 'u8'),
                          ('num_trds', 'u8')])
 
     # Daily data is returned as a numpy array of this type.
     # Daily data means daily, weekly, monthly and annual data.
-    daily_type = np.dtype([('date', 'M8[D]'),
-                           ('open_p', 'f8'),
-                           ('high_p', 'f8'),
-                           ('low_p', 'f8'),
-                           ('close_p', 'f8'),
-                           ('prd_vlm', 'u8'),
-                           ('open_int', 'u8')])
+    daily_type = np.dtype(
+            [('date', 'M8[D]'), ('open_p', 'f8'), ('high_p', 'f8'),
+             ('low_p', 'f8'), ('close_p', 'f8'), ('prd_vlm', 'u8'),
+             ('open_int', 'u8')])
 
     # Private data structure
     _databuf = namedtuple("_databuf",
                           ['failed', 'err_msg', 'num_pts', 'raw_data'])
 
-    def __init__(self, name: str="HistoryConn",
-                 host: str=FeedConn.host, port: int=port):
+    def __init__(self, name: str = "HistoryConn", host: str = FeedConn.host,
+                 port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._req_num = 0
@@ -1778,8 +1804,7 @@ class HistoryConn(FeedConn):
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
                 num_pts=self._req_numlines[req_id],
-                raw_data=self._req_buf[req_id]
-            )
+                raw_data=self._req_buf[req_id])
         self._cleanup_request_data(req_id)
         return buf
 
@@ -1834,8 +1859,8 @@ class HistoryConn(FeedConn):
                     assert line_num >= res.num_pts
             return data
 
-    def request_ticks(self, ticker: str, max_ticks: int, ascend: bool=False,
-                      timeout: int=None) -> np.array:
+    def request_ticks(self, ticker: str, max_ticks: int, ascend: bool = False,
+                      timeout: int = None) -> np.array:
         """
         Request historical tickdata. Including upto the last second.
 
@@ -1852,8 +1877,8 @@ class HistoryConn(FeedConn):
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
         pts_per_batch = min((max_ticks, 100))
-        req_cmd = ("HTX,%s,%d,%d,%s,%d\r\n" %
-                   (ticker, max_ticks, ascend, req_id, pts_per_batch))
+        req_cmd = ("HTX,%s,%d,%d,%s,%d\r\n" % (
+            ticker, max_ticks, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_ticks(req_id)
@@ -1868,10 +1893,10 @@ class HistoryConn(FeedConn):
             return data
 
     def request_ticks_for_days(self, ticker: str, num_days: int,
-                               bgn_flt: datetime.time=None,
-                               end_flt: datetime.time=None,
-                               ascend: bool=False, max_ticks: int=None,
-                               timeout: int=None) -> np.array:
+                               bgn_flt: datetime.time = None,
+                               end_flt: datetime.time = None,
+                               ascend: bool = False, max_ticks: int = None,
+                               timeout: int = None) -> np.array:
         """
         Request tickdata for a certain number of days in the past.
 
@@ -1896,9 +1921,9 @@ class HistoryConn(FeedConn):
         pts_per_batch = 100
         if max_ticks is not None:
             pts_per_batch = min((max_ticks, 100))
-        req_cmd = ("HTD,%s,%d,%s,%s,%s,%d,%s,%d\r\n" %
-                   (ticker, num_days, mt_str, bf_str, ef_str,
-                    ascend, req_id, pts_per_batch))
+        req_cmd = ("HTD,%s,%d,%s,%s,%s,%d,%s,%d\r\n" % (
+            ticker, num_days, mt_str, bf_str, ef_str, ascend, req_id,
+            pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_ticks(req_id)
@@ -1912,13 +1937,12 @@ class HistoryConn(FeedConn):
         else:
             return data
 
-    def request_ticks_in_period(self, ticker: str,
-                                bgn_prd: datetime.datetime,
+    def request_ticks_in_period(self, ticker: str, bgn_prd: datetime.datetime,
                                 end_prd: datetime.datetime,
-                                bgn_flt: datetime.time=None,
-                                end_flt: datetime.time=None, ascend: bool=False,
-                                max_ticks: int=None,
-                                timeout: int=None) -> np.array:
+                                bgn_flt: datetime.time = None,
+                                end_flt: datetime.time = None,
+                                ascend: bool = False, max_ticks: int = None,
+                                timeout: int = None) -> np.array:
         """
         Request tickdata in a certain period.
 
@@ -1947,9 +1971,9 @@ class HistoryConn(FeedConn):
         pts_per_batch = 100
         if max_ticks is not None:
             pts_per_batch = min((max_ticks, 100))
-        req_cmd = ("HTT,%s,%s,%s,%s,%s,%s,%d,%s,%d\r\n" %
-                   (ticker, bp_str, ep_str, mt_str, bf_str, ef_str,
-                    ascend, req_id, pts_per_batch))
+        req_cmd = ("HTT,%s,%s,%s,%s,%s,%s,%d,%s,%d\r\n" % (
+            ticker, bp_str, ep_str, mt_str, bf_str, ef_str, ascend, req_id,
+            pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_ticks(req_id)
@@ -1991,8 +2015,8 @@ class HistoryConn(FeedConn):
             return data
 
     def request_bars(self, ticker: str, interval_len: int, interval_type: str,
-                     max_bars: int, ascend: bool=False,
-                     timeout: int=None) -> np.array:
+                     max_bars: int, ascend: bool = False,
+                     timeout: int = None) -> np.array:
         """
         Get max_bars number of bars of bar_data from IQFeed.
 
@@ -2020,9 +2044,9 @@ class HistoryConn(FeedConn):
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
         bars_per_batch = min((100, max_bars))
-        req_cmd = ("HIX,%s,%d,%d,%d,%s,%d,%s\r\n" %
-                   (ticker, interval_len, max_bars, ascend, req_id,
-                    bars_per_batch, interval_type))
+        req_cmd = ("HIX,%s,%d,%d,%d,%s,%d,%s\r\n" % (
+            ticker, interval_len, max_bars, ascend, req_id, bars_per_batch,
+            interval_type))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2038,11 +2062,10 @@ class HistoryConn(FeedConn):
 
     def request_bars_for_days(self, ticker: str, interval_len: int,
                               interval_type: str, days: int,
-                              bgn_flt: datetime.time=None,
-                              end_flt: datetime.time=None,
-                              ascend: bool=False,
-                              max_bars: int=None,
-                              timeout: int=None) -> np.array:
+                              bgn_flt: datetime.time = None,
+                              end_flt: datetime.time = None,
+                              ascend: bool = False, max_bars: int = None,
+                              timeout: int = None) -> np.array:
         """
         Get bars for the previous N days.
 
@@ -2080,8 +2103,8 @@ class HistoryConn(FeedConn):
         if max_bars is not None:
             bars_per_batch = min((100, max_bars))
         req_cmd = "HID,%s,%d,%d,%s,%s,%s,%d,%s,%d,%s\r\n" % (
-            ticker, interval_len, days, mb_str, bf_str, ef_str, ascend,
-            req_id, bars_per_batch, interval_type)
+            ticker, interval_len, days, mb_str, bf_str, ef_str, ascend, req_id,
+            bars_per_batch, interval_type)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2095,16 +2118,13 @@ class HistoryConn(FeedConn):
         else:
             return data
 
-    def request_bars_in_period(self, ticker: str,
-                               interval_len: int,
-                               interval_type: str,
-                               bgn_prd: datetime.datetime,
+    def request_bars_in_period(self, ticker: str, interval_len: int,
+                               interval_type: str, bgn_prd: datetime.datetime,
                                end_prd: datetime.datetime,
-                               bgn_flt: datetime.time=None,
-                               end_flt: datetime.time=None,
-                               ascend: bool=False,
-                               max_bars: int=None,
-                               timeout: int=None) -> np.array:
+                               bgn_flt: datetime.time = None,
+                               end_flt: datetime.time = None,
+                               ascend: bool = False, max_bars: int = None,
+                               timeout: int = None) -> np.array:
         """
         Get bars for a specific period.
 
@@ -2144,10 +2164,9 @@ class HistoryConn(FeedConn):
         bars_per_batch = 100
         if max_bars is not None:
             bars_per_batch = min((100, max_bars))
-        req_cmd = ("HIT,%s,%d,%s,%s,%s,%s,%s,%d,%s,%d,%s\r\n" %
-                   (ticker, interval_len, bp_str, ep_str, mb_str,
-                    bf_str, ef_str, ascend, req_id,
-                    bars_per_batch, interval_type))
+        req_cmd = ("HIT,%s,%d,%s,%s,%s,%s,%s,%d,%s,%d,%s\r\n" % (
+        ticker, interval_len, bp_str, ep_str, mb_str, bf_str, ef_str, ascend,
+        req_id, bars_per_batch, interval_type))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2185,8 +2204,8 @@ class HistoryConn(FeedConn):
                     assert line_num >= res.num_pts
             return data
 
-    def request_daily_data(self, ticker: str, num_days: int, ascend: bool=False,
-                           timeout: int=None):
+    def request_daily_data(self, ticker: str, num_days: int,
+                           ascend: bool = False, timeout: int = None):
         """
         Request daily bars for the previous num_days.
 
@@ -2203,8 +2222,8 @@ class HistoryConn(FeedConn):
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
         pts_per_batch = min((100, num_days))
-        req_cmd = ("HDX,%s,%d,%d,%s,%d\r\n" %
-                   (ticker, num_days, ascend, req_id, pts_per_batch))
+        req_cmd = ("HDX,%s,%d,%d,%s,%d\r\n" % (
+        ticker, num_days, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -2218,12 +2237,11 @@ class HistoryConn(FeedConn):
         else:
             return data
 
-    def request_daily_data_for_dates(self, ticker: str,
-                                     bgn_dt: datetime.date,
+    def request_daily_data_for_dates(self, ticker: str, bgn_dt: datetime.date,
                                      end_dt: datetime.date,
-                                     ascend: bool=False,
-                                     max_days: int=None,
-                                     timeout: int=None):
+                                     ascend: bool = False, max_days: int =
+                                     None,
+                                     timeout: int = None):
         """
         Request daily bars for a specific period.
 
@@ -2247,9 +2265,8 @@ class HistoryConn(FeedConn):
         pts_per_batch = 100
         if max_days is not None:
             pts_per_batch = min((100, max_days))
-        req_cmd = ("HDT,%s,%s,%s,%s,%d,%s,%d\r\n" %
-                   (ticker, bgn_str, end_str, md_str, ascend, req_id,
-                    pts_per_batch))
+        req_cmd = ("HDT,%s,%s,%s,%s,%d,%s,%d\r\n" % (
+        ticker, bgn_str, end_str, md_str, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -2264,7 +2281,7 @@ class HistoryConn(FeedConn):
             return data
 
     def request_weekly_data(self, ticker: str, num_weeks: int,
-                            ascend: bool=False, timeout: int=None):
+                            ascend: bool = False, timeout: int = None):
         """
         Request weekly bars for the last num_weeks.
 
@@ -2281,8 +2298,8 @@ class HistoryConn(FeedConn):
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
         pts_per_batch = min((100, num_weeks))
-        req_cmd = ("HWX,%s,%d,%d,%s,%d\r\n" %
-                   (ticker, num_weeks, ascend, req_id, pts_per_batch))
+        req_cmd = ("HWX,%s,%d,%d,%s,%d\r\n" % (
+        ticker, num_weeks, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -2297,7 +2314,7 @@ class HistoryConn(FeedConn):
             return data
 
     def request_monthly_data(self, ticker: str, num_months: int,
-                             ascend: bool=False, timeout: int=None):
+                             ascend: bool = False, timeout: int = None):
         """
         Request monthly bars for the last num_months.
 
@@ -2314,8 +2331,8 @@ class HistoryConn(FeedConn):
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
         pts_per_batch = min((100, num_months))
-        req_cmd = ("HMX,%s,%d,%d,%s,%d\r\n" %
-                   (ticker, num_months, ascend, req_id, pts_per_batch))
+        req_cmd = ("HMX,%s,%d,%d,%s,%d\r\n" % (
+        ticker, num_months, ascend, req_id, pts_per_batch))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_daily_data(req_id)
@@ -2332,7 +2349,7 @@ class HistoryConn(FeedConn):
 
 class TableConn(FeedConn):
     """
-    HistoryConn is used to get type data from IQFeed's lookup socket.
+    TableConn is used to get type data from IQFeed's lookup socket.
 
     This class lets you query available market_types, security_types,
     trade_condition types, sic_codes and naic_codes from IQFeed.
@@ -2358,28 +2375,22 @@ class TableConn(FeedConn):
     host = FeedConn.host
     port = FeedConn.lookup_port
 
-    mkt_type = np.dtype([('mkt_id', 'u8'),
-                         ('short_name', 'S16'),
-                         ('name', 'S128'),
-                         ('group_id', 'u8'),
-                         ('group', 'S128')])
+    mkt_type = np.dtype(
+            [('mkt_id', 'u8'), ('short_name', 'S16'), ('name', 'S128'),
+             ('group_id', 'u8'), ('group', 'S128')])
 
-    security_type = np.dtype([('sec_type', 'u8'),
-                              ('short_name', 'S16'),
-                              ('name', 'S128')])
+    security_type = np.dtype(
+            [('sec_type', 'u8'), ('short_name', 'S16'), ('name', 'S128')])
 
-    tcond_type = np.dtype([('tcond_id', 'u8'),
-                           ('short_name', 'S16'),
-                           ('name', 'S128')])
+    tcond_type = np.dtype(
+            [('tcond_id', 'u8'), ('short_name', 'S16'), ('name', 'S128')])
 
-    sic_type = np.dtype([('sic', 'u8'),
-                         ('name', 'S128')])
+    sic_type = np.dtype([('sic', 'u8'), ('name', 'S128')])
 
-    naic_type = np.dtype([('naic', 'u8'),
-                          ('name', 'S128')])
+    naic_type = np.dtype([('naic', 'u8'), ('name', 'S128')])
 
-    def __init__(self, name: str="TableConn", host: str=FeedConn.host,
-                 port: int=port):
+    def __init__(self, name: str = "TableConn", host: str = FeedConn.host,
+                 port: int = port):
         super().__init__(name, host, port)
 
         self.markets = None
@@ -2470,12 +2481,12 @@ class TableConn(FeedConn):
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
-                    self.markets[line_num][
-                        'mkt_id'] = fr.read_uint64(data_list[0])
+                    self.markets[line_num]['mkt_id'] = fr.read_uint64(
+                            data_list[0])
                     self.markets[line_num]['short_name'] = data_list[1]
                     self.markets[line_num]['name'] = data_list[2]
-                    self.markets[line_num]['group_id'] =\
-                        fr.read_uint64(data_list[3])
+                    self.markets[line_num]['group_id'] = fr.read_uint64(
+                            data_list[3])
                     self.markets[line_num]['group'] = data_list[4]
                     line_num += 1
                     if line_num >= num_pts:
@@ -2493,13 +2504,12 @@ class TableConn(FeedConn):
             self._current_event.wait(120)
             if self._current_event.is_set():
                 num_pts = len(self._current_deque)
-                self.security_types = np.empty(
-                    num_pts, TableConn.security_type)
+                self.security_types = np.empty(num_pts, TableConn.security_type)
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
-                    self.security_types[line_num]['sec_type'] =\
-                        fr.read_uint64(data_list[0])
+                    self.security_types[line_num]['sec_type'] = fr.read_uint64(
+                            data_list[0])
                     self.security_types[line_num]['short_name'] = data_list[1]
                     self.security_types[line_num]['name'] = data_list[2]
                     line_num += 1
@@ -2522,8 +2532,8 @@ class TableConn(FeedConn):
                 line_num = 0
                 while self._current_deque and (line_num < num_pts):
                     data_list = self._current_deque.popleft()
-                    self.trade_conds[line_num]['tcond_id'] =\
-                        fr.read_uint64(data_list[0])
+                    self.trade_conds[line_num]['tcond_id'] = fr.read_uint64(
+                            data_list[0])
                     self.trade_conds[line_num]['short_name'] = data_list[1]
                     self.trade_conds[line_num]['name'] = data_list[2]
                     line_num += 1
@@ -2598,38 +2608,34 @@ class LookupConn(FeedConn):
     host = FeedConn.host
     port = FeedConn.lookup_port
 
-    futures_month_letter_map = {1: 'F', 2: 'G', 3: 'H',
-                                4: 'J', 5: 'K', 6: 'M',
-                                7: 'N', 8: 'Q', 9: 'U',
-                                10: 'V', 11: 'X', 12: 'Z'}
-    futures_month_letters = ('F', 'G', 'H', 'J', 'K', 'M',
-                             'N', 'Q', 'U', 'V', 'X', 'Z')
+    futures_month_letter_map = {1: 'F', 2: 'G', 3: 'H', 4: 'J', 5: 'K',
+                                6: 'M',
+                                7: 'N', 8: 'Q', 9: 'U', 10: 'V', 11: 'X',
+                                12: 'Z'}
+    futures_month_letters = (
+            'F', 'G', 'H', 'J', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z')
 
-    equity_call_month_letters = ('A', 'B', 'C', 'D', 'E', 'F',
-                                 'G', 'H', 'I', 'J', 'K', 'L')
-    equity_call_month_letter_map = {1: 'A', 2: 'B', 3: 'C',
-                                    4: 'D', 5: 'E', 6: 'F',
-                                    7: 'G', 8: 'H', 9: 'I',
-                                    10: 'J', 11: 'K', 12: 'L'}
+    call_month_letters = (
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
+    call_month_letter_map = {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E',
+                                    6: 'F', 7: 'G', 8: 'H', 9: 'I', 10: 'J',
+                                    11: 'K', 12: 'L'}
 
-    equity_put_month_letters = ('M', 'N', 'O', 'P', 'Q', 'R',
-                                'S', 'T', 'U', 'V', 'W', 'X')
-    equity_put_month_letter_map = {1: 'M', 2: 'N', 3: 'O',
-                                   4: 'P', 5: 'Q', 6: 'R',
-                                   7: 'S', 8: 'T', 9: 'U',
-                                   10: 'V', 11: 'W', 12: 'X'}
+    put_month_letters = (
+            'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X')
+    put_month_letter_map = {1: 'M', 2: 'N', 3: 'O', 4: 'P', 5: 'Q',
+                                   6: 'R', 7: 'S', 8: 'T', 9: 'U', 10: 'V',
+                                   11: 'W', 12: 'X'}
 
-    asset_type = np.dtype([('symbol', 'S128'),
-                           ('market', 'u1'),
-                           ('security_type', 'u1'),
-                           ('name', 'S128'),
-                           ('sector', 'u8')])
+    asset_type = np.dtype(
+            [('symbol', 'S128'), ('market', 'u1'), ('security_type', 'u1'),
+             ('name', 'S128'), ('sector', 'u8')])
 
     _databuf = namedtuple("_databuf",
                           ['failed', 'err_msg', 'num_pts', 'raw_data'])
 
-    def __init__(self, name: str="SymbolSearchConn",
-                 host: str=FeedConn.host, port: int=port):
+    def __init__(self, name: str = "SymbolSearchConn",
+                 host: str = FeedConn.host, port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._req_num = 0
@@ -2689,11 +2695,10 @@ class LookupConn(FeedConn):
         """Get the data buffer for a specific request."""
         with self._req_lock:
             buf = LookupConn._databuf(
-                failed=self._req_failed[req_id],
-                err_msg=self._req_err[req_id],
-                num_pts=self._req_numlines[req_id],
-                raw_data=self._req_buf[req_id]
-            )
+                    failed=self._req_failed[req_id],
+                    err_msg=self._req_err[req_id],
+                    num_pts=self._req_numlines[req_id],
+                    raw_data=self._req_buf[req_id])
         self._cleanup_request_data(req_id)
         return buf
 
@@ -2719,8 +2724,10 @@ class LookupConn(FeedConn):
                     assert line_num >= res.num_pts
             return data
 
-    def request_symbols_by_filter(self, search_term: str, search_field: str='d',
-                                  filt_val: str=None, filt_type: str=None,
+    def request_symbols_by_filter(self, search_term: str,
+                                  search_field: str = 'd', filt_val: str =
+                                  None,
+                                  filt_type: str = None,
                                   timeout=None) -> np.array:
         """
         Search for symbols and return matches.
@@ -2742,11 +2749,9 @@ class LookupConn(FeedConn):
 
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "SBF,%s,%s,%s,%s,%s\r\n" % (search_field,
-                                              search_term,
-                                              fr.blob_to_str(filt_type),
-                                              fr.blob_to_str(filt_val),
-                                              req_id)
+        req_cmd = "SBF,%s,%s,%s,%s,%s\r\n" % (
+            search_field, search_term, fr.blob_to_str(filt_type),
+            fr.blob_to_str(filt_val), req_id)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_symbols(req_id)
@@ -2836,12 +2841,9 @@ class LookupConn(FeedConn):
                 chain = chain[:-1]
             return chain
 
-    def request_futures_chain(self,
-                              symbol: str,
-                              month_codes: str=None,
-                              years: str=None,
-                              near_months: int=None,
-                              timeout: int=None) -> List[str]:
+    def request_futures_chain(self, symbol: str, month_codes: str = None,
+                              years: str = None, near_months: int = None,
+                              timeout: int = None) -> List[str]:
         """
         Request a futures chain
         :param symbol: Underlying symbol.
@@ -2869,11 +2871,9 @@ class LookupConn(FeedConn):
 
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "CFU,%s,%s,%s,%s,%s\r\n" % (symbol,
-                                              fr.blob_to_str(month_codes),
-                                              fr.blob_to_str(years),
-                                              fr.blob_to_str(near_months),
-                                              req_id)
+        req_cmd = "CFU,%s,%s,%s,%s,%s\r\n" % (
+            symbol, fr.blob_to_str(month_codes), fr.blob_to_str(years),
+            fr.blob_to_str(near_months), req_id)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_futures_chain(req_id)
@@ -2883,12 +2883,13 @@ class LookupConn(FeedConn):
         else:
             return data
 
-    def request_futures_spread_chain(self,
-                                     symbol: str,
-                                     month_codes: str=None,
-                                     years: str=None,
-                                     near_months: int=None,
-                                     timeout: int=None) -> List[str]:
+    def request_futures_spread_chain(
+            self,
+            symbol: str,
+            month_codes: str = None,
+            years: str = None,
+            near_months: int = None,
+            timeout: int = None) -> List[str]:
         """
         Request a chain of futures spreads
         :param symbol: Underlying symbol.
@@ -2916,11 +2917,9 @@ class LookupConn(FeedConn):
 
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "CFS,%s,%s,%s,%s,%s\r\n" % (symbol,
-                                              fr.blob_to_str(month_codes),
-                                              fr.blob_to_str(years),
-                                              fr.blob_to_str(near_months),
-                                              req_id)
+        req_cmd = "CFS,%s,%s,%s,%s,%s\r\n" % (
+            symbol, fr.blob_to_str(month_codes), fr.blob_to_str(years),
+            fr.blob_to_str(near_months), req_id)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_futures_chain(req_id)
@@ -2948,13 +2947,11 @@ class LookupConn(FeedConn):
                     put_symbols = put_symbols[:-1]
             return {"c": call_symbols, "p": put_symbols}
 
-    def request_futures_option_chain(self,
-                                     symbol: str,
-                                     opt_type: str='pc',
-                                     month_codes: str=None,
-                                     years: str=None,
-                                     near_months: int=None,
-                                     timeout: int=None) -> dict:
+    def request_futures_option_chain(self, symbol: str, opt_type: str = 'pc',
+                                     month_codes: str = None, years: str =
+                                     None,
+                                     near_months: int = None,
+                                     timeout: int = None) -> dict:
         """
         Request a chain of options on futures contracts.
 
@@ -2989,30 +2986,31 @@ class LookupConn(FeedConn):
 
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "CFO,%s,%s,%s,%s,%s,%s\r\n" % (symbol,
-                                                 opt_type,
-                                                 fr.blob_to_str(month_codes),
-                                                 fr.blob_to_str(years),
-                                                 fr.blob_to_str(near_months),
-                                                 req_id)
+        req_cmd = "CFO,%s,%s,%s,%s,%s,%s\r\n" % (
+            symbol, opt_type, fr.blob_to_str(month_codes), fr.blob_to_str(years),
+            fr.blob_to_str(near_months), req_id)
+        print("Req Futures Option Chain: %s" % req_cmd)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_option_chain(req_id)
         if (type(data) == list) and (data[0] == "!ERROR!"):
-            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[1]))
-            raise RuntimeError(err_msg)
+            iqfeed_err = str(data[1])
+            err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
+            if iqfeed_err == "!NO_DATA!":
+                raise NoDataError(err_msg)
+            else:
+                raise RuntimeError(err_msg)
         else:
             return data
 
-    def request_equity_option_chain(self, symbol: str,
-                                    opt_type: str='pc',
-                                    month_codes: str=None,
-                                    near_months: int=None,
-                                    include_binary: bool=True,
-                                    filt_type: int=0,
-                                    filt_val_1: float=None,
-                                    filt_val_2: float=None,
-                                    timeout: int=None) -> dict:
+    def request_equity_option_chain(self, symbol: str, opt_type: str = 'pc',
+                                    month_codes: str = None,
+                                    near_months: int = None,
+                                    include_binary: bool = True,
+                                    filt_type: int = 0,
+                                    filt_val_1: float = None,
+                                    filt_val_2: float = None,
+                                    timeout: int = None) -> dict:
         """
         Request a chain of options on an equity.
 
@@ -3049,8 +3047,9 @@ class LookupConn(FeedConn):
             elif opt_type == 'c':
                 valid_month_codes = LookupConn.equity_call_month_letters
             elif opt_type == 'cp' or opt_type == 'pc':
-                valid_month_codes = (LookupConn.equity_call_month_letters +
-                                     LookupConn.equity_put_month_letters)
+                valid_month_codes = (
+                    LookupConn.equity_call_month_letters +
+                    LookupConn.equity_put_month_letters)
             # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in valid_month_codes
@@ -3062,15 +3061,10 @@ class LookupConn(FeedConn):
             assert filt_val_1 < filt_val_2
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd =\
-            "CEO,%s,%s,%s,%s,%d,%d,%s,%s,%s\r\n" % (symbol, opt_type,
-                                                    fr.blob_to_str(month_codes),
-                                                    fr.blob_to_str(near_months),
-                                                    include_binary,
-                                                    filt_type,
-                                                    fr.blob_to_str(filt_val_1),
-                                                    fr.blob_to_str(filt_val_2),
-                                                    req_id)
+        req_cmd = "CEO,%s,%s,%s,%s,%d,%d,%s,%s,%s\r\n" % (
+            symbol, opt_type, fr.blob_to_str(month_codes),
+            fr.blob_to_str(near_months), include_binary, filt_type,
+            fr.blob_to_str(filt_val_1), fr.blob_to_str(filt_val_2), req_id)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_option_chain(req_id)
@@ -3115,21 +3109,14 @@ class BarConn(FeedConn):
     host = FeedConn.host
     port = FeedConn.deriv_port
 
-    interval_data_type = np.dtype([('symbol', 'S64'),
-                                   ('date', 'M8[D]'),
-                                   ('time', 'u8'),
-                                   ('open_p', 'f8'),
-                                   ('high_p', 'f8'),
-                                   ('low_p', 'f8'),
-                                   ('close_p', 'f8'),
-                                   ('tot_vlm', 'u8'),
-                                   ('prd_vlm', 'u8'),
-                                   ('num_trds', 'u8')])
+    interval_data_type = np.dtype(
+            [('symbol', 'S64'), ('date', 'M8[D]'), ('time', 'u8'),
+             ('open_p', 'f8'), ('high_p', 'f8'), ('low_p', 'f8'),
+             ('close_p', 'f8'), ('tot_vlm', 'u8'), ('prd_vlm', 'u8'),
+             ('num_trds', 'u8')])
 
-    def __init__(self,
-                 name: str="BarConn",
-                 host: str=host,
-                 port: int=port):
+    def __init__(self, name: str = "BarConn", host: str = host,
+                 port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._empty_interval_msg = np.zeros(1, dtype=BarConn.interval_data_type)
@@ -3139,8 +3126,8 @@ class BarConn(FeedConn):
         self._pf_dict['n'] = self._process_invalid_symbol
         self._pf_dict['B'] = self._process_bars
         self._sm_dict["REPLACED PREVIOUS WATCH"] = self._process_replaced_watch
-        self._sm_dict["SYMBOL LIMIT REACHED"] = \
-            self._process_symbol_limit_reached
+        self._sm_dict[
+            "SYMBOL LIMIT REACHED"] = self._process_symbol_limit_reached
         self._sm_dict["WATCHES"] = self._process_watch
 
     def _process_invalid_symbol(self, fields: Sequence[str]) -> None:
@@ -3153,7 +3140,7 @@ class BarConn(FeedConn):
 
     def _process_replaced_watch(self, fields: Sequence[str]):
         """Called when a request supersedes an prior interval request."""
-        assert len(fields) == 3
+        assert len(fields) > 2
         assert fields[0] == 'S'
         assert fields[1] == 'REPLACED PREVIOUS WATCH'
         symbol = fields[2]
@@ -3171,7 +3158,7 @@ class BarConn(FeedConn):
 
     def _process_watch(self, fields: Sequence[str]) -> None:
         """Process a watches message."""
-        assert len(fields) >= 4
+        assert len(fields) > 3
         assert fields[0] == 'S'
         assert fields[1] == 'WATCHES'
         symbol = fields[2]
@@ -3184,21 +3171,21 @@ class BarConn(FeedConn):
 
     def _process_bars(self, fields: Sequence[str]):
         """Parse bar data and call appropriate callback."""
-        assert len(fields) >= 11
+        assert len(fields) > 10
         assert fields[0][0] == "B" and fields[1][0] == "B"
 
         interval_data = self._empty_interval_msg
         interval_data['symbol'] = fields[2]
-        interval_data['date'], interval_data['time'] =\
-            fr.read_posix_ts(fields[3])
+        interval_data['date'], interval_data['time'] = fr.read_posix_ts(
+                fields[3])
         interval_data['open_p'] = np.float64(fields[4])
         interval_data['high_p'] = np.float64(fields[5])
         interval_data['low_p'] = np.float64(fields[6])
         interval_data['close_p'] = np.float64(fields[7])
         interval_data['tot_vlm'] = np.float64(fields[8])
         interval_data['prd_vlm'] = np.float64(fields[9])
-        interval_data['num_trds'] = (np.float64(fields[10])
-                                     if fields[10] != "" else 0)
+        interval_data['num_trds'] = (
+            np.float64(fields[10]) if fields[10] != "" else 0)
 
         bar_type = fields[1][1]
         if bar_type == 'U':
@@ -3213,14 +3200,10 @@ class BarConn(FeedConn):
         else:
             raise UnexpectedField("Bad bar type in BarConn")
 
-    def watch(self,
-              symbol: str,
-              interval_len: int, interval_type: str=None,
-              bgn_flt: datetime.time=None, end_flt: datetime.time=None,
-              update: int=None,
-              bgn_bars: datetime.datetime=None,
-              lookback_days: int=None,
-              lookback_bars: int=None) -> None:
+    def watch(self, symbol: str, interval_len: int, interval_type: str = None,
+              bgn_flt: datetime.time = None, end_flt: datetime.time = None,
+              update: int = None, bgn_bars: datetime.datetime = None,
+              lookback_days: int = None, lookback_bars: int = None) -> None:
         """
         Request live interval (bar) data.
 
@@ -3266,17 +3249,10 @@ class BarConn(FeedConn):
 
         request_id = "B-%s-%0.4d-%s" % (symbol, interval_len, interval_type)
 
-        bar_cmd =\
-            "BW,%s,%s,%s,%s,%s,%s,%s,%s,%s,'',%s\r\n" % (symbol,
-                                                         interval_len,
-                                                         bgn_bar_str,
-                                                         lookback_days_str,
-                                                         lookback_bars_str,
-                                                         bf_str,
-                                                         ef_str,
-                                                         request_id,
-                                                         interval_type,
-                                                         update_str)
+        bar_cmd = "BW,%s,%s,%s,%s,%s,%s,%s,%s,%s,'',%s\r\n" % (
+            symbol, interval_len, bgn_bar_str, lookback_days_str,
+            lookback_bars_str,
+            bf_str, ef_str, request_id, interval_type, update_str)
         self._send_cmd(bar_cmd)
 
     def unwatch(self, symbol: str):
@@ -3316,21 +3292,15 @@ class NewsConn(FeedConn):
                           ('failed', 'err_msg', 'num_pts', 'raw_data'))
 
     # Same as real-time news updates
-    NewsMsg = namedtuple("NewsMsg",
-                         ("story_id",
-                          "distributor",
-                          "symbol_list",
-                          "story_time",
-                          "headline"))
+    NewsMsg = namedtuple("NewsMsg", (
+        "story_id", "distributor", "symbol_list", "story_time", "headline"))
 
-    NewsStoryMsg = namedtuple("NewsStoryMsg",
-                              ("story", "is_link"))
+    NewsStoryMsg = namedtuple("NewsStoryMsg", ("story", "is_link"))
 
-    NewsCountMsg = namedtuple("NewsCountMsg",
-                              ("symbol", "count"))
+    NewsCountMsg = namedtuple("NewsCountMsg", ("symbol", "count"))
 
-    def __init__(self, name: str="NewsConn",
-                 host: str=FeedConn.host, port: int=port):
+    def __init__(self, name: str = "NewsConn", host: str = FeedConn.host,
+                 port: int = port):
         super().__init__(name, host, port)
         self._set_message_mappings()
         self._req_num = 0
@@ -3389,11 +3359,10 @@ class NewsConn(FeedConn):
     def _get_data_buf(self, req_id: str) -> namedtuple:
         with self._req_lock:
             buf = NewsConn._databuf(
-                failed=self._req_failed[req_id],
-                err_msg=self._req_err[req_id],
-                num_pts=self._req_numlines[req_id],
-                raw_data=self._req_buf[req_id]
-            )
+                    failed=self._req_failed[req_id],
+                    err_msg=self._req_err[req_id],
+                    num_pts=self._req_numlines[req_id],
+                    raw_data=self._req_buf[req_id])
         self._cleanup_request_data(req_id)
         return buf
 
@@ -3417,7 +3386,7 @@ class NewsConn(FeedConn):
             structure["sub_elems"] = descendants
         return structure
 
-    def request_news_config(self, timeout: int=None) -> dict:
+    def request_news_config(self, timeout: int = None) -> dict:
         """
         News Configuration request
 
@@ -3468,19 +3437,16 @@ class NewsConn(FeedConn):
                     headline = item.text
 
             news_headlines.append(
-                NewsConn.NewsMsg(story_id=story_id,
-                                 distributor=distributor,
-                                 symbol_list=symbol_list,
-                                 story_time=story_time,
-                                 headline=headline))
+                    NewsConn.NewsMsg(story_id=story_id,
+                                     distributor=distributor,
+                                     symbol_list=symbol_list,
+                                     story_time=story_time, headline=headline))
         return news_headlines
 
-    def request_news_headlines(self,
-                               sources: List[str]=None,
-                               symbols: List[str]=None,
-                               date: datetime.date=None,
-                               limit: int=1000,
-                               timeout: int=None) -> List[NewsMsg]:
+    def request_news_headlines(self, sources: List[str] = None,
+                               symbols: List[str] = None,
+                               date: datetime.date = None, limit: int = 1000,
+                               timeout: int = None) -> List[NewsMsg]:
         """
         Get all current news headlines.
 
@@ -3551,7 +3517,7 @@ class NewsConn(FeedConn):
         return NewsConn.NewsStoryMsg(is_link=is_link, story=story)
 
     def request_news_story(self, story_id: str,
-                           timeout: int=None) -> NewsStoryMsg:
+                           timeout: int = None) -> NewsStoryMsg:
         """
         Request the news story corresponding to a story id.
 
@@ -3604,17 +3570,16 @@ class NewsConn(FeedConn):
         story_counts = []
         for count_data in xml_data:
             story_counts.append(
-               NewsConn.NewsCountMsg(
-                   symbol=count_data.attrib['Name'],
-                   count=int(count_data.attrib['StoryCount'])))
+                    NewsConn.NewsCountMsg(
+                            symbol=count_data.attrib['Name'],
+                            count=int(count_data.attrib['StoryCount'])))
         return story_counts
 
-    def request_story_counts(self,
-                             symbols: List[str],
-                             sources: List[str]=None,
-                             bgn_dt: datetime.date=None,
-                             end_dt: datetime.date=None,
-                             timeout: int=None) -> List[NewsCountMsg]:
+    def request_story_counts(self, symbols: List[str],
+                             sources: List[str] = None,
+                             bgn_dt: datetime.date = None,
+                             end_dt: datetime.date = None,
+                             timeout: int = None) -> List[NewsCountMsg]:
         """
         Request News Story Counts.
 

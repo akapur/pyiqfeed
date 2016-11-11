@@ -82,6 +82,10 @@ class SilentIQFeedListener:
         """Timestamp when you have requested timestamps."""
         pass
 
+    def process_error(self, fields):
+        """Called with an error message"""
+        pass
+
 
 # noinspection PyMethodMayBeStatic
 class SilentQuoteListener(SilentIQFeedListener):
@@ -453,6 +457,9 @@ class VerboseIQFeedListener:
         print("%s: Timestamp:" % self._name)
         print(time_val)
 
+    def process_error(self, fields):
+        print("%s: Process Error:" % self._name)
+        print(fields)
 
 # noinspection PyMethodMayBeStatic,PyMissingOrEmptyDocstring
 class VerboseQuoteListener(VerboseIQFeedListener):

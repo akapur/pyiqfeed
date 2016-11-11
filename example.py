@@ -32,16 +32,13 @@ def get_level_1_quotes_and_trades(ticker: str, seconds: int):
     quote_conn = iq.QuoteConn(name="pyiqfeed-Example-lvl1")
     quote_listener = iq.VerboseQuoteListener("Level 1 Listener")
     quote_conn.add_listener(quote_listener)
-    quote_conn.start_runner()
-
-    all_fields = sorted(list(iq.QuoteConn.quote_msg_map.keys()))
-    quote_conn.select_update_fieldnames(all_fields)
-    quote_conn.watch(ticker)
-    time.sleep(seconds)
-    quote_conn.unwatch(ticker)
-    quote_conn.remove_listener(quote_listener)
-    quote_conn.stop_runner()
-    del quote_conn
+    with iq.ConnConnector([quote_conn]) as connector:
+        all_fields = sorted(list(iq.QuoteConn.quote_msg_map.keys()))
+        quote_conn.select_update_fieldnames(all_fields)
+        quote_conn.watch(ticker)
+        time.sleep(seconds)
+        quote_conn.unwatch(ticker)
+        quote_conn.remove_listener(quote_listener)
 
 
 def get_regional_quotes(ticker: str, seconds: int):
@@ -50,14 +47,11 @@ def get_regional_quotes(ticker: str, seconds: int):
     quote_conn = iq.QuoteConn(name="pyiqfeed-Example-regional")
     quote_listener = iq.VerboseQuoteListener("Regional Listener")
     quote_conn.add_listener(quote_listener)
-    quote_conn.start_runner()
 
-    quote_conn.regional_watch(ticker)
-    time.sleep(seconds)
-    quote_conn.regional_unwatch(ticker)
-    quote_conn.remove_listener(quote_listener)
-    quote_conn.stop_runner()
-    del quote_conn
+    with iq.ConnConnector([quote_conn]) as connector:
+        quote_conn.regional_watch(ticker)
+        time.sleep(seconds)
+        quote_conn.regional_unwatch(ticker)
 
 
 def get_trades_only(ticker: str, seconds: int):
@@ -66,14 +60,11 @@ def get_trades_only(ticker: str, seconds: int):
     quote_conn = iq.QuoteConn(name="pyiqfeed-Example-trades-only")
     quote_listener = iq.VerboseQuoteListener("Trades Listener")
     quote_conn.add_listener(quote_listener)
-    quote_conn.start_runner()
 
-    quote_conn.trades_watch(ticker)
-    time.sleep(seconds)
-    quote_conn.unwatch(ticker)
-    quote_conn.remove_listener(quote_listener)
-    quote_conn.stop_runner()
-    del quote_conn
+    with iq.ConnConnector([quote_conn]) as connector:
+        quote_conn.trades_watch(ticker)
+        time.sleep(seconds)
+        quote_conn.unwatch(ticker)
 
 
 def get_live_interval_bars(ticker: str, bar_len: int, seconds: int):
@@ -81,15 +72,11 @@ def get_live_interval_bars(ticker: str, bar_len: int, seconds: int):
     bar_conn = iq.BarConn(name='pyiqfeed-Example-interval-bars')
     bar_listener = iq.VerboseBarListener("Bar Listener")
     bar_conn.add_listener(bar_listener)
-    bar_conn.start_runner()
 
-    bar_conn.watch(symbol=ticker, interval_len=bar_len,
-                   interval_type='s', update=1, lookback_bars=10)
-    time.sleep(seconds)
-    bar_conn.unwatch(ticker)
-    bar_conn.remove_listener(bar_listener)
-    bar_conn.stop_runner()
-    del bar_conn
+    with iq.ConnConnector([bar_conn]) as connector:
+        bar_conn.watch(symbol=ticker, interval_len=bar_len,
+                       interval_type='s', update=1, lookback_bars=10)
+        time.sleep(seconds)
 
 
 def get_administrative_messages(seconds: int):
@@ -98,13 +85,14 @@ def get_administrative_messages(seconds: int):
     admin_conn = iq.AdminConn(name="pyiqfeed-Example-admin-messages")
     admin_listener = iq.VerboseAdminListener("Admin Listener")
     admin_conn.add_listener(admin_listener)
-    admin_conn.start_runner()
-    admin_conn.set_admin_variables(product=dtn_product_id,
-                                   login=dtn_login,
-                                   password=dtn_password,
-                                   autoconnect=True)
-    admin_conn.client_stats_on()
-    time.sleep(seconds)
+
+    with iq.ConnConnector([admin_conn]) as connector:
+        admin_conn.set_admin_variables(product=dtn_product_id,
+                                       login=dtn_login,
+                                       password=dtn_password,
+                                       autoconnect=True)
+        admin_conn.client_stats_on()
+        time.sleep(seconds)
 
 
 def get_tickdata(ticker: str, max_ticks: int, num_days: int):
@@ -113,52 +101,49 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-tickdata")
     hist_listener = iq.VerboseIQFeedListener("History Tick Listener")
     hist_conn.add_listener(hist_listener)
-    hist_conn.start_runner()
 
-    # Look at docs for request_ticks, request_ticks_for_days and
+    # Look at conn.py for request_ticks, request_ticks_for_days and
     # request_ticks_in_period to see various ways to specify time periods
     # etc.
 
-    # Get the last 10 trades
-    tick_data = hist_conn.request_ticks(ticker=ticker, max_ticks=max_ticks)
-    print(tick_data)
+    with iq.ConnConnector([hist_conn]) as connector:
+        # Get the last 10 trades
+        tick_data = hist_conn.request_ticks(ticker=ticker, max_ticks=max_ticks)
+        print(tick_data)
 
-    # Get the last num_days days trades between 10AM and 12AM
-    # Limit to max_ticks ticks otherwise too much will be printed on screen
-    bgn_flt = datetime.time(hour=10, minute=0, second=0)
-    end_flt = datetime.time(hour=12, minute=0, second=0)
-    tick_data = hist_conn.request_ticks_for_days(ticker=ticker,
-                                                 num_days=num_days,
-                                                 bgn_flt=bgn_flt,
-                                                 end_flt=end_flt,
-                                                 max_ticks=max_ticks)
-    print(tick_data)
+        # Get the last num_days days trades between 10AM and 12AM
+        # Limit to max_ticks ticks otherwise too much will be printed on screen
+        bgn_flt = datetime.time(hour=10, minute=0, second=0)
+        end_flt = datetime.time(hour=12, minute=0, second=0)
+        tick_data = hist_conn.request_ticks_for_days(ticker=ticker,
+                                                     num_days=num_days,
+                                                     bgn_flt=bgn_flt,
+                                                     end_flt=end_flt,
+                                                     max_ticks=max_ticks)
+        print(tick_data)
 
-    # Get all ticks between 9:30AM 5 days ago and 9:30AM today
-    # Limit to max_ticks since otherwise too much will be printed on
-    # screen
-    today = datetime.date.today()
-    sdt = today - datetime.timedelta(days=5)
-    start_tm = datetime.datetime(year=sdt.year,
-                                 month=sdt.month,
-                                 day=sdt.day,
-                                 hour=9,
-                                 minute=30)
-    edt = today
-    end_tm = datetime.datetime(year=edt.year,
-                               month=edt.month,
-                               day=edt.day,
-                               hour=9,
-                               minute=30)
+        # Get all ticks between 9:30AM 5 days ago and 9:30AM today
+        # Limit to max_ticks since otherwise too much will be printed on
+        # screen
+        today = datetime.date.today()
+        sdt = today - datetime.timedelta(days=5)
+        start_tm = datetime.datetime(year=sdt.year,
+                                     month=sdt.month,
+                                     day=sdt.day,
+                                     hour=9,
+                                     minute=30)
+        edt = today
+        end_tm = datetime.datetime(year=edt.year,
+                                   month=edt.month,
+                                   day=edt.day,
+                                   hour=9,
+                                   minute=30)
 
-    tick_data = hist_conn.request_ticks_in_period(ticker=ticker,
-                                                  bgn_prd=start_tm,
-                                                  end_prd=end_tm,
-                                                  max_ticks=max_ticks)
-    print(tick_data)
-    hist_conn.remove_listener(hist_listener)
-    hist_conn.stop_runner()
-    del hist_conn
+        tick_data = hist_conn.request_ticks_in_period(ticker=ticker,
+                                                      bgn_prd=start_tm,
+                                                      end_prd=end_tm,
+                                                      max_ticks=max_ticks)
+        print(tick_data)
 
 
 def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
@@ -167,40 +152,36 @@ def get_historical_bar_data(ticker: str, bar_len: int, bar_unit: str,
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-historical-bars")
     hist_listener = iq.VerboseIQFeedListener("History Bar Listener")
     hist_conn.add_listener(hist_listener)
-    hist_conn.start_runner()
 
-    # look at docs for request_bars, request_bars_for_days and
-    # request_bars_in_period for other ways to specify time periods etc
-    bars = hist_conn.request_bars(ticker=ticker,
-                                  interval_len=bar_len,
-                                  interval_type=bar_unit,
-                                  max_bars=num_bars)
-    print(bars)
+    with iq.ConnConnector([hist_conn]) as connector:
+        # look at conn.py for request_bars, request_bars_for_days and
+        # request_bars_in_period for other ways to specify time periods etc
+        bars = hist_conn.request_bars(ticker=ticker,
+                                      interval_len=bar_len,
+                                      interval_type=bar_unit,
+                                      max_bars=num_bars)
+        print(bars)
 
-    today = datetime.date.today()
-    start_date = today - datetime.timedelta(days=10)
-    start_time = datetime.datetime(year=start_date.year,
-                                   month=start_date.month,
-                                   day=start_date.day,
-                                   hour=0,
-                                   minute=0,
-                                   second=0)
-    end_time = datetime.datetime(year=today.year,
-                                 month=today.month,
-                                 day=today.day,
-                                 hour=23,
-                                 minute=59,
-                                 second=59)
-    bars = hist_conn.request_bars_in_period(
-        ticker=ticker,
-        interval_len=bar_len,
-        interval_type=bar_unit,
-        bgn_prd=start_time,
-        end_prd=end_time)
-    print(bars)
-    hist_conn.remove_listener(hist_listener)
-    hist_conn.stop_runner()
-    del hist_conn
+        today = datetime.date.today()
+        start_date = today - datetime.timedelta(days=10)
+        start_time = datetime.datetime(year=start_date.year,
+                                       month=start_date.month,
+                                       day=start_date.day,
+                                       hour=0,
+                                       minute=0,
+                                       second=0)
+        end_time = datetime.datetime(year=today.year,
+                                     month=today.month,
+                                     day=today.day,
+                                     hour=23,
+                                     minute=59,
+                                     second=59)
+        bars = hist_conn.request_bars_in_period(ticker=ticker,
+                                                interval_len=bar_len,
+                                                interval_type=bar_unit,
+                                                bgn_prd=start_time,
+                                                end_prd=end_time)
+        print(bars)
 
 
 def get_daily_data(ticker: str, num_days: int):
@@ -208,13 +189,10 @@ def get_daily_data(ticker: str, num_days: int):
     hist_conn = iq.HistoryConn(name="pyiqfeed-Example-daily-data")
     hist_listener = iq.VerboseIQFeedListener("History Bar Listener")
     hist_conn.add_listener(hist_listener)
-    hist_conn.start_runner()
 
-    daily_data = hist_conn.request_daily_data(ticker, num_days)
-    hist_conn.remove_listener(hist_listener)
-    print(daily_data)
-    hist_conn.stop_runner()
-    del hist_conn
+    with iq.ConnConnector([hist_conn]) as connector:
+        daily_data = hist_conn.request_daily_data(ticker, num_days)
+        print(daily_data)
 
 
 def get_reference_data():
