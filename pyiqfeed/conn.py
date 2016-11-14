@@ -1719,12 +1719,24 @@ class HistoryConn(FeedConn):
                           ('tot_vlm', 'u8'), ('bid', 'f8'), ('ask', 'f8'),
                           ('cond1', 'u1'), ('cond2', 'u1'), ('cond3', 'u1'),
                           ('cond4', 'u1')])
+    tick_h5_type = np.dtype([('tick_id', 'u8'), ('date', 'i8'), ('time', 'u8'),
+                          ('last', 'f8'), ('last_sz', 'u8'),
+                          ('last_type', 'S1'), ('mkt_ctr', 'u4'),
+                          ('tot_vlm', 'u8'), ('bid', 'f8'), ('ask', 'f8'),
+                          ('cond1', 'u1'), ('cond2', 'u1'), ('cond3', 'u1'),
+                          ('cond4', 'u1')])
+
 
     # Bar data is returned as a numpy array of this type.
     bar_type = np.dtype([('date', 'M8[D]'), ('time', 'u8'), ('open_p', 'f8'),
                          ('high_p', 'f8'), ('low_p', 'f8'), ('close_p', 'f8'),
                          ('tot_vlm', 'u8'), ('prd_vlm', 'u8'),
                          ('num_trds', 'u8')])
+    bar_h5_type = np.dtype([('date', 'i8'), ('time', 'u8'), ('open_p', 'f8'),
+                         ('high_p', 'f8'), ('low_p', 'f8'), ('close_p', 'f8'),
+                         ('tot_vlm', 'u8'), ('prd_vlm', 'u8'),
+                         ('num_trds', 'u8')])
+
 
     # Daily data is returned as a numpy array of this type.
     # Daily data means daily, weekly, monthly and annual data.
@@ -1732,6 +1744,11 @@ class HistoryConn(FeedConn):
             [('date', 'M8[D]'), ('open_p', 'f8'), ('high_p', 'f8'),
              ('low_p', 'f8'), ('close_p', 'f8'), ('prd_vlm', 'u8'),
              ('open_int', 'u8')])
+    daily_h5_type = np.dtype(
+            [('date', 'i8'), ('open_p', 'f8'), ('high_p', 'f8'),
+             ('low_p', 'f8'), ('close_p', 'f8'), ('prd_vlm', 'u8'),
+             ('open_int', 'u8')])
+
 
     # Private data structure
     _databuf = namedtuple("_databuf",
