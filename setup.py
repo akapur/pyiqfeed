@@ -7,7 +7,7 @@ setup(
     name='pyiqfeed',
     version='0.9',
     description='Handles connections to IQFeed, the market data feed by DTN',
-    url='http://github.com/storborg/funniest',
+    url='https://github.com/akapur/pyiqfeed',
     author='Ashwin Kapur',
     author_email='akapur@amvirk.com',
     license='GPL v2',
