@@ -59,7 +59,7 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 from .exceptions import NoDataError, UnexpectedField, UnexpectedMessage
-from .exceptions import UnexpectedProtocol
+from .exceptions import UnexpectedProtocol, UnauthorizedError
 from . import field_readers as fr
 
 
@@ -1904,6 +1904,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -1949,6 +1951,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -1999,6 +2003,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -2072,6 +2078,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -2130,6 +2138,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -2192,6 +2202,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -2249,6 +2261,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -2292,6 +2306,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -2325,6 +2341,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -2358,6 +2376,8 @@ class HistoryConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == '!NO_DATA!':
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:
@@ -3015,6 +3035,8 @@ class LookupConn(FeedConn):
             err_msg = "Request: %s, Error: %s" % (req_cmd, iqfeed_err)
             if iqfeed_err == "!NO_DATA!":
                 raise NoDataError(err_msg)
+            elif iqfeed_err == "Unauthorized user ID.":
+                raise UnauthorizedError(err_msg)
             else:
                 raise RuntimeError(err_msg)
         else:

@@ -12,6 +12,11 @@ class NoDataError(KeyError):
     pass
 
 
+class UnauthorizedError(RuntimeError):
+    """Raised if you make a request for data you are not authorized for."""
+    pass
+
+
 class UnexpectedField(BaseException):
     """
     Raised when we get a field with a value we don't know how to process.
@@ -43,3 +48,5 @@ class UnexpectedProtocol(BaseException):
 
     """
     pass
+
+

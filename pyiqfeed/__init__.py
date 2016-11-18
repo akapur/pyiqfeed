@@ -14,4 +14,4 @@ from .listeners import VerboseAdminListener, VerboseBarListener
 from .service import FeedService
 
 from .exceptions import NoDataError, UnexpectedField, UnexpectedMessage
-from .exceptions import UnexpectedProtocol
+from .exceptions import UnexpectedProtocol, UnauthorizedError
