@@ -584,213 +584,112 @@ class QuoteConn(FeedConn):
     # instances of QuoteConn. Use one for all stock subscriptions and one for
     # all options subscriptions. They can both update the same listener if
     # that is what you want.
-    quote_msg_map = {'Symbol'
-    : (
-    'Symbol', 'S128', lambda x: x),
-                     '7 Day Yield'
-                     : (
-                     '7 Day Yield', 'f8', fr.read_float64),
-                     'Ask'
-                     : (
-                     'Ask', 'f8', fr.read_float64),
-                     'Ask Change'
-                     : (
-                     'Ask Change', 'f8', fr.read_float64),
-                     'Ask Market Center'
-                     : (
-                     'Ask Market Center', 'u1', fr.read_uint8),
-                     'Ask Size'
-                     : (
-                     'Ask Size', 'u8', fr.read_uint64),
-                     'Ask Time'
-                     : (
-                     'Ask Time', 'u8', fr.read_hhmmssmil), # TODO: Parse:
-                     'Available Regions'
-                     : (
-                     'Available Regions', 'S128', lambda x: x),
-                     'Average Maturity'
-                     : (
-                     'Average Maturity', 'f8', fr.read_float64),
-                     'Bid'
-                     : (
-                     'Bid', 'f8', fr.read_float64),
-                     'Bid Change'
-                     : (
-                     'Bid Change', 'f8', fr.read_float64),
-                     'Bid Market Center'
-                     : (
-                     'Bid Market Center', 'u1', fr.read_uint8),
-                     'Bid Size'
-                     : (
-                     'Bid Size', 'u8', fr.read_uint64),
-                     'Bid Time'
-                     : (
-                     'Bid Time', 'u8', fr.read_hhmmssmil),
-                     'Change'
-                     : (
-                     'Change', 'f8', fr.read_float64),
-                     'Change From Open'
-                     : (
+    quote_msg_map = {'Symbol': ('Symbol', 'S128', lambda x: x),
+                     '7 Day Yield': ('7 Day Yield', 'f8', fr.read_float64),
+                     'Ask': ('Ask', 'f8', fr.read_float64),
+                     'Ask Change': ('Ask Change', 'f8', fr.read_float64),
+                     'Ask Market Center':
+                         ('Ask Market Center', 'u1', fr.read_uint8),
+                     'Ask Size': ('Ask Size', 'u8', fr.read_uint64),
+                     'Ask Time': ('Ask Time', 'u8', fr.read_hhmmssmil),
+                     # TODO: Parse:
+                     'Available Regions':
+                         ('Available Regions', 'S128', lambda x: x),
+                     'Average Maturity':
+                         ('Average Maturity', 'f8', fr.read_float64),
+                     'Bid': ('Bid', 'f8', fr.read_float64),
+                     'Bid Change': ('Bid Change', 'f8', fr.read_float64),
+                     'Bid Market Center':
+                         ('Bid Market Center', 'u1', fr.read_uint8),
+                     'Bid Size': ('Bid Size', 'u8', fr.read_uint64),
+                     'Bid Time': ('Bid Time', 'u8', fr.read_hhmmssmil),
+                     'Change': ('Change', 'f8', fr.read_float64),
+                     'Change From Open': (
                      'Change From Open', 'f8', fr.read_float64),
-                     'Close'
-                     : (
-                     'Close', 'f8', fr.read_float64),
-                     'Close Range 1'
-                     : (
-                     'Close Range 1', 'f8', fr.read_float64),
-                     'Close Range 2'
-                     : (
-                     'Close Range 2', 'f8', fr.read_float64),
-                     'Days to Expiration'
-                     : (
-                     'Days to Expiration', 'u2', fr.read_uint16),
-                     'Decimal Precision'
-                     : (
-                     'Decimal Precision', 'u1', fr.read_uint8),
-                     'Delay'
-                     : (
-                     'Delay', 'u1', fr.read_uint8),
-                     'Exchange ID'
-                     : (
-                     'Exchange ID', 'u1', fr.read_hex),
-                     'Extended Trade'
-                     : (
-                     'Extended Price', 'f8', fr.read_float64),
-                     'Extended Trade Date'
-                     : (
-                     'Extended Trade Date', 'M8[D]', fr.read_mmddccyy),
-                     'Extended Trade Market Center'
-                     : (
-                     'Extended Trade Market Center', 'u1', fr.read_uint8),
-                     'Extended Trade Size'
-                     : (
-                     'Extended Trade Size', 'u8', fr.read_uint64),
-                     'Extended Trade Time'
-                     : (
-                     'Extended Trade Time', 'u8', fr.read_hhmmssmil),
-                     'Extended Trading Change'
-                     : (
-                     'Extended Trading Change', 'f8', fr.read_float64),
-                     'Extended Trading Difference'
-                     : (
-                     'Extended Trading Difference', 'f8', fr.read_float64),
+                     'Close': ('Close', 'f8', fr.read_float64),
+                     'Close Range 1': ('Close Range 1', 'f8', fr.read_float64),
+                     'Close Range 2': ('Close Range 2', 'f8', fr.read_float64),
+                     'Days to Expiration':
+                         ('Days to Expiration', 'u2', fr.read_uint16),
+                     'Decimal Precision':
+                         ('Decimal Precision', 'u1', fr.read_uint8),
+                     'Delay': ('Delay', 'u1', fr.read_uint8),
+                     'Exchange ID': ('Exchange ID', 'u1', fr.read_hex),
+                     'Extended Trade': ('Extended Price', 'f8', fr.read_float64),
+                     'Extended Trade Date':
+                         ('Extended Trade Date', 'M8[D]', fr.read_mmddccyy),
+                     'Extended Trade Market Center':
+                         ('Extended Trade Market Center', 'u1', fr.read_uint8),
+                     'Extended Trade Size':
+                         ('Extended Trade Size', 'u8', fr.read_uint64),
+                     'Extended Trade Time':
+                         ('Extended Trade Time', 'u8', fr.read_hhmmssmil),
+                     'Extended Trading Change':
+                         ('Extended Trading Change', 'f8', fr.read_float64),
+                     'Extended Trading Difference':
+                         ('Extended Trading Difference', 'f8', fr.read_float64),
                      # TODO: Parse:
-                     'Financial Status Indicator'
-                     : (
-                     'Financial Status Indicator', 'S1', lambda x: x),
-                     'Fraction Display Code'
-                     : (
-                     'Fraction Display Code', 'u1', fr.read_uint8),
-                     'High'
-                     : (
-                     'High', 'f8', fr.read_float64),
-                     'Last'
-                     : (
-                     'Last', 'f8', fr.read_float64),
-                     'Last Date'
-                     : (
-                     'Last Date', 'M8[D]', fr.read_mmddccyy),
-                     'Last Market Center'
-                     : (
-                     'Last Market Center', 'u1', fr.read_uint8),
-                     'Last Size'
-                     : (
-                     'Last Size', 'u8', fr.read_uint64),
-                     'Last Time'
-                     : (
-                     'Last Time', 'u8', fr.read_hhmmssmil),
-                     'Low'
-                     : (
-                     'Low', 'f8', fr.read_float64),
-                     'Market Capitalization'
-                     : (
-                     'Market Capitalization', 'f8', fr.read_float64),
-                     'Market Open'
-                     : (
-                     'Market Open', 'b1', fr.read_is_market_open),
+                     'Financial Status Indicator':
+                         ('Financial Status Indicator', 'S1', lambda x: x),
+                     'Fraction Display Code':
+                         ('Fraction Display Code', 'u1', fr.read_uint8),
+                     'High': ('High', 'f8', fr.read_float64),
+                     'Last': ('Last', 'f8', fr.read_float64),
+                     'Last Date': ('Last Date', 'M8[D]', fr.read_mmddccyy),
+                     'Last Market Center':
+                         ('Last Market Center', 'u1', fr.read_uint8),
+                     'Last Size': ('Last Size', 'u8', fr.read_uint64),
+                     'Last Time': ('Last Time', 'u8', fr.read_hhmmssmil),
+                     'Low': ('Low', 'f8', fr.read_float64),
+                     'Market Capitalization':
+                         ('Market Capitalization', 'f8', fr.read_float64),
+                     'Market Open':
+                         ('Market Open', 'b1', fr.read_is_market_open),
                      # TODO: Parse:
-                     'Message Contents'
-                     : (
-                     'Message Contents', 'S9', lambda x: x),
-                     'Most Recent Trade'
-                     : (
-                     'Most Recent Trade', 'f8', fr.read_float64),
-                     'Most Recent Trade Conditions'
-                     : (
-                     'Most Recent Trade Conditions', 'S16', lambda x: x),
+                     'Message Contents':
+                         ('Message Contents', 'S9', lambda x: x),
+                     'Most Recent Trade':
+                         ('Most Recent Trade', 'f8', fr.read_float64),
+                     'Most Recent Trade Conditions':
+                         ('Most Recent Trade Conditions', 'S16', lambda x: x),
                      # todo: Parse
-                     'Most Recent Trade Date'
-                     : (
-                     'Most Recent Trade Date', 'M8[D]', fr.read_mmddccyy),
-                     'Most Recent Trade Market Center'
-                     : (
-                     'Most Recent Trade Market Center', 'u1', fr.read_uint8),
-                     'Most Recent Trade Size'
-                     : (
-                     'Most Recent Trade Size', 'u8', fr.read_uint64),
-                     'Most Recent Trade Time'
-                     : (
-                     'Most Recent Trade Time', 'u8', fr.read_hhmmssmil),
-                     'Net Asset Value'
-                     : (
-                     'Net Asset Value', 'f8', fr.read_float64),
-                     'Number of Trades Today'
-                     : (
-                     'Number of Trades Today', 'u8', fr.read_uint64),
-                     'Open'
-                     : (
-                     'Open', 'f8', fr.read_float64),
-                     'Open Interest'
-                     : (
-                     'Open Interest', 'u8', fr.read_uint64),
-                     'Open Range 1'
-                     : (
-                     'Open Range 1', 'f8', fr.read_float64),
-                     'Open Range 2'
-                     : (
-                     'Open Range 2', 'f8', fr.read_float64),
-                     'Percent Change'
-                     : (
-                     'Percent Change', 'f8', fr.read_float64),
-                     'Percent Off Average Volume'
-                     : (
-                     'Percent Off Average Volume', 'f8', fr.read_float64),
-                     'Previous Day Volume'
-                     : (
-                     'Previous Day Volume', 'u8', fr.read_uint64),
-                     'Price-Earnings Ratio'
-                     : (
-                     'Price-Earnings Ratio', 'f8', fr.read_float64),
-                     'Range'
-                     : (
-                     'Range', 'f8', fr.read_float64),
-                     'Restricted Code'
-                     : (
-                     'Restricted Code', 'b1', fr.read_is_short_restricted),
-                     'Settle'
-                     : (
-                     'Settle', 'f8', fr.read_float64),
-                     'Settlement Date'
-                     : (
-                     'Settlement Date', 'M8[D]', fr.read_mmddccyy),
-                     'Spread'
-                     : (
-                     'Spread', 'f8', fr.read_float64),
-                     'Tick'
-                     : (
-                     'Tick', 'i8', fr.read_tick_direction),
-                     'TickID'
-                     : (
-                     'TickId', 'u8', fr.read_uint64),
-                     'Total Volume'
-                     : (
-                     'Total Volume', 'u8', fr.read_uint64),
-                     'Volatility'
-                     : (
-                     'Volatility', 'f8', fr.read_float64),
-                     'VWAP'
-                     : (
-                     'VWAP', 'f8', fr.read_float64)}
+                     'Most Recent Trade Date':
+                         ('Most Recent Trade Date', 'M8[D]', fr.read_mmddccyy),
+                     'Most Recent Trade Market Center':
+                         ('Most Recent Trade Market Center', 'u1',
+                          fr.read_uint8),
+                     'Most Recent Trade Size':
+                         ('Most Recent Trade Size', 'u8', fr.read_uint64),
+                     'Most Recent Trade Time':
+                         ('Most Recent Trade Time', 'u8', fr.read_hhmmssmil),
+                     'Net Asset Value':
+                         ('Net Asset Value', 'f8', fr.read_float64),
+                     'Number of Trades Today':
+                         ('Number of Trades Today', 'u8', fr.read_uint64),
+                     'Open':('Open', 'f8', fr.read_float64),
+                     'Open Interest': ('Open Interest', 'u8', fr.read_uint64),
+                     'Open Range 1': ('Open Range 1', 'f8', fr.read_float64),
+                     'Open Range 2': ('Open Range 2', 'f8', fr.read_float64),
+                     'Percent Change':
+                         ('Percent Change', 'f8', fr.read_float64),
+                     'Percent Off Average Volume':
+                         ('Percent Off Average Volume', 'f8', fr.read_float64),
+                     'Previous Day Volume':
+                         ('Previous Day Volume', 'u8', fr.read_uint64),
+                     'Price-Earnings Ratio':
+                         ('Price-Earnings Ratio', 'f8', fr.read_float64),
+                     'Range':('Range', 'f8', fr.read_float64),
+                     'Restricted Code':
+                         ('Restricted Code', 'b1', fr.read_is_short_restricted),
+                     'Settle': ('Settle', 'f8', fr.read_float64),
+                     'Settlement Date':
+                         ('Settlement Date', 'M8[D]', fr.read_mmddccyy),
+                     'Spread': ('Spread', 'f8', fr.read_float64),
+                     'Tick': ('Tick', 'i8', fr.read_tick_direction),
+                     'TickID': ('TickId', 'u8', fr.read_uint64),
+                     'Total Volume': ('Total Volume', 'u8', fr.read_uint64),
+                     'Volatility': ('Volatility', 'f8', fr.read_float64),
+                     'VWAP': ('VWAP', 'f8', fr.read_float64)}
 
     NewsMsg = namedtuple("NewsMsg", (
         "story_id", "distributor", "symbol_list", "story_time", "headline"))
@@ -1424,9 +1323,9 @@ class AdminConn(FeedConn):
     host = FeedConn.host
 
     ClientStatsMsg = namedtuple("ClientStatsMsg", (
-    "client_type", "client_id", "client_name", "start_dt", "start_tm",
-    "kb_sent", "kb_recvd", "kb_queued", "num_quote_subs", "num_reg_subs",
-    "num_depth_subs"))
+        "client_type", "client_id", "client_name", "start_dt", "start_tm",
+        "kb_sent", "kb_recvd", "kb_queued", "num_quote_subs", "num_reg_subs",
+        "num_depth_subs"))
 
     def __init__(self, name: str = "AdminConn", host: str = host,
                  port: int = port):
@@ -1562,12 +1461,16 @@ class AdminConn(FeedConn):
         elif 2 == type_int:
             num_depth_subs = num_sym
 
-        client_stats = AdminConn.ClientStatsMsg(client_type=client_type,
-                client_id=client_id, client_name=client_name,
-                                                start_dt=start_dt,
-                start_tm=start_tm, kb_sent=kb_sent, kb_recvd=kb_recvd,
-                kb_queued=kb_queued, num_quote_subs=num_quote_subs,
-                num_reg_subs=num_reg_subs, num_depth_subs=num_depth_subs)
+        client_stats = AdminConn.ClientStatsMsg(
+            client_type=client_type,
+            client_id=client_id, client_name=client_name,
+            start_dt=start_dt, start_tm=start_tm,
+            kb_sent=kb_sent,
+            kb_recvd=kb_recvd,
+            kb_queued=kb_queued,
+            num_quote_subs=num_quote_subs,
+            num_reg_subs=num_reg_subs,
+            num_depth_subs=num_depth_subs)
         for listener in self._listeners:
             listener.process_client_stats(client_stats)
 

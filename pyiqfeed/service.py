@@ -40,7 +40,8 @@ import subprocess
 def _is_iqfeed_running():
     """Return True if a socket can connect to the IQFeed Admin Port."""
     iqfeed_host = "127.0.0.1"
-    iqfeed_ports = [5009, 9100, 9200, 9300, 9400]
+    # Admin port is first since that is ready first
+    iqfeed_ports = [9300, 5009, 9100, 9200, 9400]
 
     try:
         for port in iqfeed_ports:
@@ -90,13 +91,15 @@ class FeedService:
     def launch(self,
                timeout: int=20,
                check_conn: bool = True,
-               headless: bool = False) -> None:
+               headless: bool = False,
+               nohup: bool = True) -> None:
         """
         Launch IQConnect.exe if necessary
 
         :param timeout: Throw if IQConnect is not listening in timeout secs.
         :param check_conn: Try opening connections to IQFeed before returning.
         :param headless: Set to true if running in headless mode on X windows.
+        :param nohup: Set to true if you want IQFeed launched with nohup
         :return: True if IQConnect is now listening for connections.
 
         """
@@ -114,11 +117,12 @@ class FeedService:
                              SW_SHOWNORMAL)
             elif sys.platform == 'darwin' or sys.platform == 'linux':
                 base_iqfeed_call = "wine iqconnect.exe %s" % iqfeed_args
+                prefix_str = ""
+                if nohup:
+                    prefix_str += "nohup "
                 if headless:
-                    iqfeed_call = ("nohup xvfb-run -s -noreset -a %s" %
-                                   base_iqfeed_call)
-                else:
-                    iqfeed_call = ("nohup %s" % base_iqfeed_call)
+                    prefix_str += "xvfb-run -s -noreset -a "
+                iqfeed_call = prefix_str + base_iqfeed_call
 
                 print("Running %s" % iqfeed_call)
                 subprocess.Popen(iqfeed_call,
@@ -127,7 +131,6 @@ class FeedService:
                                  stdout=subprocess.DEVNULL,
                                  stderr=subprocess.DEVNULL,
                                  preexec_fn=os.setpgrp)
-                time.sleep(1)
             if check_conn:
                 start_time = time.time()
                 while not _is_iqfeed_running():
