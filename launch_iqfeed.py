@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Launch IQFeed.")
     parser.add_argument('--nohup', action='store_true',
-                        dest='nohup', default=True,
+                        dest='nohup', default=False,
                         help="Don't kill IQFeed.exe when this script exists.")
     parser.add_argument('--headless', action="store_true",
                         dest='headless', default=False,
