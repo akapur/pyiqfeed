@@ -25,7 +25,6 @@ Read the comments and code in service.py for more details.
 """
 
 import os
-import sys
 import time
 import argparse
 import pyiqfeed as iq
