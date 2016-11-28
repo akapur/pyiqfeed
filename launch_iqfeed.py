@@ -1,9 +1,10 @@
+#! /usr/bin/env python3
 # coding=utf-8
 
 """
 This is an example that launches IQConnect.exe.
 
-You need a file called password.py (described in README.md that can be
+You need a file called localconfig.py (described in README.md that can be
 imported here.
 
 This code just launches IQConnect.exe and returns.
@@ -28,7 +29,7 @@ import os
 import time
 import argparse
 import pyiqfeed as iq
-from passwords import dtn_product_id, dtn_login, dtn_password
+from localconfig import dtn_product_id, dtn_login, dtn_password
 
 if __name__ == "__main__":
 

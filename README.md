@@ -56,7 +56,7 @@ For an example of how to use it do the following:
 works.
 
 2. Create a file in the same directory as example.py called
-passwords.py. In this file you need 3 lines:
+localconfig.py. In this file you need 3 lines:
 
 <pre> <code>
  dtn_product_id = "PRODUCT_ID_FROM_DTN"
