@@ -23,6 +23,13 @@ IQConnect.exe to exit.
 
 Read the comments and code in service.py for more details.
 
+This program launches an instance of IQFeed.exe if it isn't running, creates
+an AdminConn and writes messages received by the AdminConn to stdout. It looks
+for a file with the name passed as the option ctrl_file, defaults to
+./stop_iqfeed.ctrl. When it sees that file it drops it's connection to
+IQFeed.exe, deletes the control file and exits. If there are no other open
+connections to IQFeed.exe, IQFeed.exe will by default exit 5 seconds later.
+
 """
 
 import os

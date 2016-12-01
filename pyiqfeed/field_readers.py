@@ -52,16 +52,16 @@ def read_tick_direction(field: str) -> np.int8:
     if field != "":
         field_as_int = int(field)
         if field_as_int == 173:
-            return 1
+            return np.int8(1)
         if field_as_int == 175:
-            return -1
+            return np.int8(-1)
         if field_as_int == 183:
-            return 0
+            return np.int8(0)
         else:
             raise UnexpectedField(
                 "Unknown value in Tick Direction Field: %s" % field)
     else:
-        return 0
+        return np.int8(0)
 
 
 def read_int(field: str) -> int:
@@ -170,7 +170,7 @@ def read_ccyymmdd(field: str) -> np.datetime64:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
 
 
-def read_yyyymmdd_hhmmss(dt_tm: str) -> typing.Tuple[datetime.date, int]:
+def read_timestamp_msg(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
     """Read a CCYYMMDD HH:MM:SS field."""
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
@@ -181,7 +181,7 @@ def read_yyyymmdd_hhmmss(dt_tm: str) -> typing.Tuple[datetime.date, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-def read_live_news_timestamp(dt_tm: str) -> typing.Tuple[datetime.date, int]:
+def read_live_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
     """Read a CCYYMMDD HH:MM:SS field."""
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
@@ -192,16 +192,24 @@ def read_live_news_timestamp(dt_tm: str) -> typing.Tuple[datetime.date, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-def read_hist_news_timestamp(dt_tm: str) -> datetime.datetime:
+def read_hist_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
     """Read a news story time"""
-    year = int(dt_tm[0:4])
-    month = int(dt_tm[4:6])
-    day = int(dt_tm[6:8])
-    hour = int(dt_tm[8:10])
-    minute = int(dt_tm[10:12])
-    second = int(dt_tm[12:14])
-    return datetime.datetime(year=year, month=month, day=day,
-                             hour=hour, minute=minute, second=second)
+    # year = int(dt_tm[0:4])
+    # month = int(dt_tm[4:6])
+    # day = int(dt_tm[6:8])
+    # hour = int(dt_tm[8:10])
+    # minute = int(dt_tm[10:12])
+    # second = int(dt_tm[12:14])
+    # return datetime.datetime(year=year, month=month, day=day,
+    #                          hour=hour, minute=minute, second=second)
+    if dt_tm != "":
+        date_str = dt_tm[0:8]
+        time_str = dt_tm[8:14]
+        dt = read_ccyymmdd(date_str)
+        tm = read_hhmmss_no_colon(time_str)
+        return dt, tm
+    else:
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
 def read_posix_ts_mil(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
@@ -238,11 +246,15 @@ def us_since_midnight_to_time(us: int) -> datetime.time:
     """Convert us since midnight to datetime.time with rounding."""
     assert us >= 0
     assert us <= 86400000000
+    microsecond = us % 1000000
     secs_since_midnight = np.floor(us / 1000000.0)
     hour = np.floor(secs_since_midnight / 3600)
     minute = np.floor((secs_since_midnight - (hour * 3600)) / 60)
     second = secs_since_midnight - (hour * 3600) - (minute * 60)
-    return datetime.time(hour=int(hour), minute=int(minute), second=int(second))
+    return datetime.time(hour=int(hour),
+                         minute=int(minute),
+                         second=int(second),
+                         microsecond=int(microsecond))
 
 
 def time_to_hhmmss(tm: datetime.time) -> str:
@@ -266,12 +278,13 @@ def date_to_yyyymmdd(dt: datetime.date) -> str:
         return ""
 
 
-def date_ms_to_datetime(dt64: np.datetime64, tm_int: int) -> datetime.datetime:
+def date_us_to_datetime(dt64: np.datetime64, tm_int: int) -> datetime.datetime:
     """Convert a np.datetime64('D') and us_since midnight to datetime"""
     dt = datetime64_to_date(dt64)
     tm = us_since_midnight_to_time(tm_int)
     return datetime.datetime(year=dt.year, month=dt.month, day=dt.day,
-                             hour=tm.hour, minute=tm.minute, second=tm.second)
+                             hour=tm.hour, minute=tm.minute, second=tm.second,
+                             microsecond=tm.microsecond)
 
 
 def datetime_to_yyyymmdd_hhmmss(dt_tm: datetime.datetime) -> str:
