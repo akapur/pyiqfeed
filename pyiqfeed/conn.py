@@ -359,19 +359,27 @@ class FeedConn:
         assert fields[0] == "S"
         assert fields[1] == "STATS"
         conn_stats = FeedConn.ConnStatsMsg(
-                server_ip=fields[2],
-                server_port=int(fields[3]), max_sym=int(fields[4]),
-                num_sym=int(fields[5]), num_clients=int(fields[6]),
-                secs_since_update=int(fields[7]), num_recon=int(fields[8]),
-                num_fail_recon=int(fields[9]),
-                conn_tm=time.strptime(fields[10], "%b %d %I:%M%p"),
-                mkt_tm=(time.strptime(fields[11], "%b %d %I:%M%p")
-                        if self.connected() else None),
-                status=(fields[12] == "Connected"), feed_version=fields[13],
-                login=fields[14], kbs_recv=float(fields[15]),
-                kbps_recv=float(fields[16]), avg_kbps_recv=float(fields[17]),
-                kbs_sent=float(fields[18]), kbps_sent=float(fields[19]),
-                avg_kbps_sent=float(fields[20]))
+            server_ip=fields[2],
+            server_port=fr.read_int(fields[3]),
+            max_sym=fr.read_int(fields[4]),
+            num_sym=fr.read_int(fields[5]),
+            num_clients=fr.read_int(fields[6]),
+            secs_since_update=fr.read_int(fields[7]),
+            num_recon=fr.read_int(fields[8]),
+            num_fail_recon=fr.read_int(fields[9]),
+            conn_tm=(time.strptime(fields[10], "%b %d %I:%M%p")
+                     if fields[10] != "" else None),
+            mkt_tm=(time.strptime(fields[11], "%b %d %I:%M%p")
+                    if self.connected() else None),
+            status=(fields[12] == "Connected"),
+            feed_version=fields[13],
+            login=fields[14],
+            kbs_recv=fr.read_float(fields[15]),
+            kbps_recv=fr.read_float(fields[16]),
+            avg_kbps_recv=fr.read_float(fields[17]),
+            kbs_sent=fr.read_float(fields[18]),
+            kbps_sent=fr.read_float(fields[19]),
+            avg_kbps_sent=fr.read_float(fields[20]))
         for listener in self._listeners:
             listener.process_conn_stats(conn_stats)
 
