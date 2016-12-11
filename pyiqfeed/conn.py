@@ -183,7 +183,7 @@ class FeedConn:
     def _send_cmd(self, cmd: str) -> None:
         with self._send_lock:
             # noinspection PyArgumentEqualDefault
-            self._sock.sendall(cmd.encode(encoding='utf-8', errors='strict'))
+            self._sock.sendall(cmd.encode(encoding='latin-1', errors='strict'))
 
     def reconnect_failed(self) -> bool:
         """
@@ -725,13 +725,22 @@ class QuoteConn(FeedConn):
                                        "Most Recent Trade Conditions"]
         self._num_update_fields = len(self._current_update_fields)
         self._set_current_update_structs(self._current_update_fields)
-        self._request_fundamental_fieldnames()
-        self._request_all_update_fieldnames()
-        self._request_current_update_fieldnames()
 
         self._empty_fundamental_msg = np.zeros(
                 1, dtype=QuoteConn.fundamental_type)
         self._empty_regional_msg = np.zeros(1, dtype=QuoteConn.regional_type)
+
+    def connect(self) -> None:
+        """
+        Call super.connect and call make initialization requests.
+
+        """
+        super().connect()
+
+        self._request_fundamental_fieldnames()
+        self._request_all_update_fieldnames()
+        self._request_current_update_fieldnames()
+
 
     def _set_message_mappings(self) -> None:
         """Creates map of message processing functions."""
