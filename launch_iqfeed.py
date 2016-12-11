@@ -36,7 +36,8 @@ import os
 import time
 import argparse
 import pyiqfeed as iq
-from localconfig import dtn_product_id, dtn_login, dtn_password
+
+from passwords import dtn_product_id, dtn_login, dtn_password
 
 if __name__ == "__main__":
 
@@ -48,7 +49,7 @@ if __name__ == "__main__":
                         dest='headless', default=False,
                         help="Launch IQFeed in a headless XServer.")
     parser.add_argument('--control_file', action='store',
-                        dest='ctrl_file', default="./stop_iqfeed.ctrl",
+                        dest='ctrl_file', default="/tmp/stop_iqfeed.ctrl",
                         help='Stop running if this file exists.')
     arguments = parser.parse_args()
 
