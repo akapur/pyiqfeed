@@ -48,4 +48,3 @@ class UnexpectedProtocol(BaseException):
 
     """
     pass
-

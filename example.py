@@ -115,11 +115,12 @@ def get_tickdata(ticker: str, max_ticks: int, num_days: int):
     with iq.ConnConnector([hist_conn]) as connector:
         # Get the last 10 trades
         try:
-            tick_data = hist_conn.request_ticks(ticker=ticker, max_ticks=max_ticks)
+            tick_data = hist_conn.request_ticks(ticker=ticker,
+                                                max_ticks=max_ticks)
             print(tick_data)
 
             # Get the last num_days days trades between 10AM and 12AM
-            # Limit to max_ticks ticks otherwise too much will be printed on screen
+            # Limit to max_ticks ticks else too much will be printed on screen
             bgn_flt = datetime.time(hour=10, minute=0, second=0)
             end_flt = datetime.time(hour=12, minute=0, second=0)
             tick_data = hist_conn.request_ticks_for_days(ticker=ticker,
