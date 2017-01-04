@@ -55,7 +55,7 @@ import time
 from collections import deque, namedtuple
 from typing import Sequence, List
 # noinspection PyPep8Naming
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as etree
 
 import numpy as np
 from .exceptions import NoDataError, UnexpectedField, UnexpectedMessage
@@ -82,7 +82,7 @@ class FeedConn:
 
     port = quote_port
 
-    ConnStatsMsg = namedtuple('ConnStatsData', (
+    ConnStatsMsg = namedtuple('ConnStatsMsg', (
         'server_ip', 'server_port', 'max_sym', 'num_sym', 'num_clients',
         'secs_since_update', 'num_recon', 'num_fail_recon', 'conn_tm', 'mkt_tm',
         'status', 'feed_version', 'login', 'kbs_recv', 'kbps_recv',
@@ -700,7 +700,8 @@ class QuoteConn(FeedConn):
                      'VWAP': ('VWAP', 'f8', fr.read_float64)}
 
     NewsMsg = namedtuple("NewsMsg", (
-        "story_id", "distributor", "symbol_list", "story_time", "headline"))
+        "story_id", "distributor", "symbol_list",
+        "story_date", "story_time", "headline"))
 
     CustomerInfoMsg = namedtuple("CustomerInfoMsg", (
         "svc_type", "ip_address", "port", "token", "version", "rt_exchanges",
@@ -732,15 +733,13 @@ class QuoteConn(FeedConn):
 
     def connect(self) -> None:
         """
-        Call super.connect and call make initialization requests.
+        Call super.connect() and call make initialization requests.
 
         """
         super().connect()
-
         self._request_fundamental_fieldnames()
         self._request_all_update_fieldnames()
         self._request_current_update_fieldnames()
-
 
     def _set_message_mappings(self) -> None:
         """Creates map of message processing functions."""
@@ -3346,10 +3345,10 @@ class NewsConn(FeedConn):
             return np.array([res.err_msg], dtype='object')
         else:
             raw_text = '\n'.join([''.join(line[1:]) for line in res.raw_data])
-            return ET.fromstring(raw_text)
+            return etree.fromstring(raw_text)
 
-    def _create_config_structure(self, xml_data: ET.Element) -> dict:
-        """Convert ET.Element of configuration into nested list"""
+    def _create_config_structure(self, xml_data: etree.Element) -> dict:
+        """Convert et.Element of configuration into nested list"""
         structure = xml_data.attrib
         structure["elem_type"] = xml_data.tag
         if len(xml_data) > 0:
@@ -3386,7 +3385,7 @@ class NewsConn(FeedConn):
         return self._create_config_structure(xml_data)
 
     @staticmethod
-    def _create_headline_list(xml_data: ET.Element) -> List[NewsMsg]:
+    def _create_headline_list(xml_data: etree.Element) -> List[NewsMsg]:
         """Parse Headlines formatted as XML."""
         news_headlines = []
         for cur_headline in xml_data:
@@ -3481,7 +3480,7 @@ class NewsConn(FeedConn):
         return self._create_headline_list(xml_data)
 
     @staticmethod
-    def _create_news_story(xml_data: ET.Element) -> NewsStoryMsg:
+    def _create_news_story(xml_data: etree.Element) -> NewsStoryMsg:
         """Convert news stories into NewsStoryMsgs."""
         is_link = 'N'
         story = None
@@ -3542,7 +3541,7 @@ class NewsConn(FeedConn):
         self._send_cmd(req_cmd)
 
     @staticmethod
-    def _create_story_counts(xml_data: ET.Element) -> List[NewsCountMsg]:
+    def _create_story_counts(xml_data: etree.Element) -> List[NewsCountMsg]:
         """Parse story counts and return as NewsCountMsg."""
         story_counts = []
         for count_data in xml_data:
