@@ -82,7 +82,7 @@ class FeedConn:
 
     port = quote_port
 
-    ConnStatsMsg = namedtuple('ConnStatsData', (
+    ConnStatsMsg = namedtuple('ConnStatsMsg', (
         'server_ip', 'server_port', 'max_sym', 'num_sym', 'num_clients',
         'secs_since_update', 'num_recon', 'num_fail_recon', 'conn_tm', 'mkt_tm',
         'status', 'feed_version', 'login', 'kbs_recv', 'kbps_recv',
@@ -700,7 +700,8 @@ class QuoteConn(FeedConn):
                      'VWAP': ('VWAP', 'f8', fr.read_float64)}
 
     NewsMsg = namedtuple("NewsMsg", (
-        "story_id", "distributor", "symbol_list", "story_time", "headline"))
+        "story_id", "distributor", "symbol_list",
+        "story_date", "story_time", "headline"))
 
     CustomerInfoMsg = namedtuple("CustomerInfoMsg", (
         "svc_type", "ip_address", "port", "token", "version", "rt_exchanges",
