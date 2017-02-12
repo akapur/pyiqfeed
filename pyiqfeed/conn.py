@@ -598,7 +598,7 @@ class QuoteConn(FeedConn):
                      'Ask Market Center':
                          ('Ask Market Center', 'u1', fr.read_uint8),
                      'Ask Size': ('Ask Size', 'u8', fr.read_uint64),
-                     'Ask Time': ('Ask Time', 'u8', fr.read_hhmmssmil),
+                     'Ask Time': ('Ask Time', 'u8', fr.read_hhmmssus),
                      # TODO: Parse:
                      'Available Regions':
                          ('Available Regions', 'S128', lambda x: x),
@@ -609,7 +609,7 @@ class QuoteConn(FeedConn):
                      'Bid Market Center':
                          ('Bid Market Center', 'u1', fr.read_uint8),
                      'Bid Size': ('Bid Size', 'u8', fr.read_uint64),
-                     'Bid Time': ('Bid Time', 'u8', fr.read_hhmmssmil),
+                     'Bid Time': ('Bid Time', 'u8', fr.read_hhmmssus),
                      'Change': ('Change', 'f8', fr.read_float64),
                      'Change From Open': (
                      'Change From Open', 'f8', fr.read_float64),
@@ -631,7 +631,7 @@ class QuoteConn(FeedConn):
                      'Extended Trade Size':
                          ('Extended Trade Size', 'u8', fr.read_uint64),
                      'Extended Trade Time':
-                         ('Extended Trade Time', 'u8', fr.read_hhmmssmil),
+                         ('Extended Trade Time', 'u8', fr.read_hhmmssus),
                      'Extended Trading Change':
                          ('Extended Trading Change', 'f8', fr.read_float64),
                      'Extended Trading Difference':
@@ -647,7 +647,7 @@ class QuoteConn(FeedConn):
                      'Last Market Center':
                          ('Last Market Center', 'u1', fr.read_uint8),
                      'Last Size': ('Last Size', 'u8', fr.read_uint64),
-                     'Last Time': ('Last Time', 'u8', fr.read_hhmmssmil),
+                     'Last Time': ('Last Time', 'u8', fr.read_hhmmssus),
                      'Low': ('Low', 'f8', fr.read_float64),
                      'Market Capitalization':
                          ('Market Capitalization', 'f8', fr.read_float64),
@@ -669,7 +669,7 @@ class QuoteConn(FeedConn):
                      'Most Recent Trade Size':
                          ('Most Recent Trade Size', 'u8', fr.read_uint64),
                      'Most Recent Trade Time':
-                         ('Most Recent Trade Time', 'u8', fr.read_hhmmssmil),
+                         ('Most Recent Trade Time', 'u8', fr.read_hhmmssus),
                      'Net Asset Value':
                          ('Net Asset Value', 'f8', fr.read_float64),
                      'Number of Trades Today':
