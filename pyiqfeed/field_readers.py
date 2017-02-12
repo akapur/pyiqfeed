@@ -146,6 +146,18 @@ def read_hhmmssmil(field: str) -> int:
         return 0
 
 
+def read_hhmmssus(field: str) -> int:
+    """Read a HH:MM:SS.us field and return us since midnight."""
+    if field != "":
+        hour = int(field[0:2])
+        minute = int(field[3:5])
+        second = int(field[6:8])
+        micro = int(field[9:])
+        return (1000000 * ((3600 * hour) + (60 * minute) + second)) + micro
+    else:
+        return 0
+
+
 def read_mmddccyy(field: str) -> np.datetime64:
     """Read a MM-DD-CCYY field and return a np.datetime64('D') type."""
     if field != "":
@@ -218,6 +230,17 @@ def read_posix_ts_mil(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
         (date_str, time_str) = dt_tm_str.split(" ")
         dt = np.datetime64(date_str, 'D')
         tm = read_hhmmssmil(time_str)
+        return dt, tm
+    else:
+        return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
+
+
+def read_posix_ts_us(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
+    """ Read a POSIX-Date HH:MM:SS:us field."""
+    if dt_tm_str != "":
+        (date_str, time_str) = dt_tm_str.split(" ")
+        dt = np.datetime64(date_str, 'D')
+        tm = read_hhmmssus(time_str)
         return dt, tm
     else:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
