@@ -62,6 +62,9 @@ from .exceptions import NoDataError, UnexpectedField, UnexpectedMessage
 from .exceptions import UnexpectedProtocol, UnauthorizedError
 from . import field_readers as fr
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class FeedConn:
     """
@@ -2958,7 +2961,7 @@ class LookupConn(FeedConn):
             fr.blob_to_str(years),
             fr.blob_to_str(near_months),
             req_id)
-        print("Req Futures Option Chain: %s" % req_cmd)
+        logging.info("Req Futures Option Chain: %s" % req_cmd)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_option_chain(req_id)

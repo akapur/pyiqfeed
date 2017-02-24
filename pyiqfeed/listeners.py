@@ -461,6 +461,7 @@ class VerboseIQFeedListener:
         print("%s: Process Error:" % self._name)
         print(fields)
 
+
 # noinspection PyMethodMayBeStatic,PyMissingOrEmptyDocstring
 class VerboseQuoteListener(VerboseIQFeedListener):
     """

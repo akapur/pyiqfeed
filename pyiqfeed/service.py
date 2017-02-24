@@ -36,6 +36,10 @@ import socket
 import select
 import subprocess
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def _is_iqfeed_running():
     """Return True if a socket can connect to the IQFeed Admin Port."""
@@ -124,7 +128,7 @@ class FeedService:
                     prefix_str += "xvfb-run -s -noreset -a "
                 iqfeed_call = prefix_str + base_iqfeed_call
 
-                print("Running %s" % iqfeed_call)
+                logging.info("Running %s" % iqfeed_call)
                 subprocess.Popen(iqfeed_call,
                                  shell=True,
                                  stdin=subprocess.DEVNULL,
