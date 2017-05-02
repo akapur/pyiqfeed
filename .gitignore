@@ -14,3 +14,5 @@ passwords.py
 
 # Pycache
 __pycache__
+
+build/
