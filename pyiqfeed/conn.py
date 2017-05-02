@@ -2693,8 +2693,8 @@ class LookupConn(FeedConn):
 
         :param search_term: 's': search symbols, 'd': search descriptions.
         :param search_field: What to search for.
-        :param filt_val: 'e': Specific markets, 't': Specific security types.
-        :param filt_type: Space delimited list of markets of security types.
+        :param filt_val: 'e': Space delimited list of markets of security types.
+        :param filt_type: Specific markets, 't': Specific security types.
         :param timeout: Must return before timeout or die, Default None
         :return: np.array of dtype LookupConn.asset_type
 
