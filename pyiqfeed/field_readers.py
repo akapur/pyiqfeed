@@ -133,15 +133,14 @@ def read_hhmmss(field: str) -> int:
         return 0
 
 
-def read_hhmmssmil(field: str) -> int:
-    """Read a HH:MM:SS:MILL field and return us since midnight."""
+def read_hhmmssus(field: str) -> int:
+    """Read a HH:MM:SS.us field and return us since midnight."""
     if field != "":
         hour = int(field[0:2])
         minute = int(field[3:5])
         second = int(field[6:8])
-        msecs = int(field[9:])
-        return ((1000000 * ((3600 * hour) + (60 * minute) + second)) +
-                (1000 * msecs))
+        microsecond = int(float(field[8:]) * 1e6)
+        return int((1e6 * ((3600 * hour) + (60 * minute) + second)) + microsecond)
     else:
         return 0
 
@@ -229,7 +228,7 @@ def read_posix_ts_mil(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
         dt = np.datetime64(date_str, 'D')
-        tm = read_hhmmssmil(time_str)
+        tm = read_hhmmssus(time_str)
         return dt, tm
     else:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
