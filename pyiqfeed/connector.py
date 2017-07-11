@@ -46,6 +46,6 @@ class ConnConnector:
             conn.connect()
         return self._conn_list
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         for conn in self._conn_list:
             conn.disconnect()

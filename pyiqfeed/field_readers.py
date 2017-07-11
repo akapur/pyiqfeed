@@ -206,14 +206,6 @@ def read_live_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
 
 def read_hist_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
     """Read a news story time"""
-    # year = int(dt_tm[0:4])
-    # month = int(dt_tm[4:6])
-    # day = int(dt_tm[6:8])
-    # hour = int(dt_tm[8:10])
-    # minute = int(dt_tm[10:12])
-    # second = int(dt_tm[12:14])
-    # return datetime.datetime(year=year, month=month, day=day,
-    #                          hour=hour, minute=minute, second=second)
     if dt_tm != "":
         date_str = dt_tm[0:8]
         time_str = dt_tm[8:14]

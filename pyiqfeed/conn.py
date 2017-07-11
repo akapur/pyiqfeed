@@ -120,7 +120,7 @@ class FeedConn:
         Connect to the appropriate socket and start the reading thread.
 
         You must call this before you start using an XXXConn class. If
-        this thread is not running, no callbacks will be called, not data
+        this thread is not running, no callbacks will be called, no data
         will be returned by functions which return data immediately.
 
         """
