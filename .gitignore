@@ -1,18 +1,16 @@
 # Created by .ignore support plugin (hsz.mobi)
+
+### JetBrains Files
+.iml
+.idea
+.idea/
+
 # Distribution / packaging
 *.egg-info/
-
-### JetBrains template
-# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio
-*.iml
-
-# User-specific stuff:
-# Sensitive or high-churn files:
 
 # Logins and Passwords used for testing
 passwords.py
 
 # Pycache
 __pycache__
-
 build/
