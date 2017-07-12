@@ -145,8 +145,10 @@ class FeedConn:
 
         """
         self.stop_runner()
-        self._sock.shutdown(socket.SHUT_RDWR)
-        self._sock.close()
+        if self._sock:
+            self._sock.shutdown(socket.SHUT_RDWR)
+            self._sock.close()
+            self._sock = None
 
     def stop_runner(self) -> None:
         """Called to stop the reading and message processing thread."""

@@ -5,7 +5,7 @@ Functions used to parse individual fields in the feed.
 
 """
 
-import typing
+from typing import Union, Tuple
 import datetime
 import numpy as np
 from pyiqfeed.exceptions import UnexpectedField
@@ -99,7 +99,7 @@ def read_float64(field: str) -> np.float64:
     return np.float64(field) if field != "" else np.nan
 
 
-def read_split_string(split_str: str) -> typing.Tuple[np.float64,
+def read_split_string(split_str: str) -> Tuple[np.float64,
                                                       np.datetime64]:
     """Read a field that encodes the last split date and last split factor."""
     split_fld_0, split_fld_1 = ("", "")
@@ -182,7 +182,7 @@ def read_ccyymmdd(field: str) -> np.datetime64:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D')
 
 
-def read_timestamp_msg(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
+def read_timestamp_msg(dt_tm: str) -> Tuple[np.datetime64, int]:
     """Read a CCYYMMDD HH:MM:SS field."""
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
@@ -193,7 +193,7 @@ def read_timestamp_msg(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-def read_live_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
+def read_live_news_timestamp(dt_tm: str) -> Tuple[np.datetime64, int]:
     """Read a CCYYMMDD HH:MM:SS field."""
     if dt_tm != "":
         (date_str, time_str) = dt_tm.split(' ')
@@ -204,7 +204,7 @@ def read_live_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-def read_hist_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
+def read_hist_news_timestamp(dt_tm: str) -> Tuple[np.datetime64, int]:
     """Read a news story time"""
     if dt_tm != "":
         date_str = dt_tm[0:8]
@@ -216,7 +216,7 @@ def read_hist_news_timestamp(dt_tm: str) -> typing.Tuple[np.datetime64, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-def read_posix_ts_mil(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
+def read_posix_ts_mil(dt_tm_str: str) -> Tuple[np.datetime64, int]:
     """ Read a POSIX-Date HH:MM:SS:MILL field."""
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
@@ -227,7 +227,7 @@ def read_posix_ts_mil(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-def read_posix_ts_us(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
+def read_posix_ts_us(dt_tm_str: str) -> Tuple[np.datetime64, int]:
     """ Read a POSIX-Date HH:MM:SS:us field."""
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
@@ -238,7 +238,7 @@ def read_posix_ts_us(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
         return np.datetime64(datetime.date(year=1, month=1, day=1), 'D'), 0
 
 
-def read_posix_ts(dt_tm_str: str) -> typing.Tuple[np.datetime64, int]:
+def read_posix_ts(dt_tm_str: str) -> Tuple[np.datetime64, int]:
     """Read a POSIX-DATE HH:MM:SS field."""
     if dt_tm_str != "":
         (date_str, time_str) = dt_tm_str.split(" ")
@@ -257,8 +257,10 @@ def str_or_blank(val) -> str:
         return ""
 
 
-def us_since_midnight_to_time(us: int) -> datetime.time:
+def us_since_midnight_to_time(
+        us_dt: Union[int, np.datetime64]) -> datetime.time:
     """Convert us since midnight to datetime.time with rounding."""
+    us = us_dt.astype('int')
     assert us >= 0
     assert us <= 86400000000
     microsecond = us % 1000000
@@ -293,7 +295,8 @@ def date_to_yyyymmdd(dt: datetime.date) -> str:
         return ""
 
 
-def date_us_to_datetime(dt64: np.datetime64, tm_int: int) -> datetime.datetime:
+def date_us_to_datetime(dt64: np.datetime64,
+                        tm_int: Union[int, np.datetime64]) -> datetime.datetime:
     """Convert a np.datetime64('D') and us_since midnight to datetime"""
     dt = datetime64_to_date(dt64)
     tm = us_since_midnight_to_time(tm_int)
