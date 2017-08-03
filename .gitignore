@@ -1,16 +1,36 @@
-# Created by .ignore support plugin (hsz.mobi)
-
-### JetBrains Files
-.iml
-.idea
+### JetBrains Directory based format template
+# Covers all JetBrains IDEs
 .idea/
 
-# Distribution / packaging
+# If you comment the above exclude the below
+# Sensitive or high-churn files:
+.idea/dataSources.ids
+.idea/dataSources.xml
+.idea/sqlDataSources.xml
+.idea/dynamic.xml
+.idea/uiDesigner.xml
+
+# Mongo Explorer plugin:
+.idea/mongoSettings.xml
+
+## Plugin-specific files:
+# IntelliJ
+/out/
+
+# Python specific
 *.egg-info/
 
-# Logins and Passwords used for testing
+# Files with credentials
 passwords.py
 
-# Pycache
-__pycache__
+# Caches
+__pycache__/
+*/__pycache__/
 build/
+
+# Rope stuff
+.ropeproject/
+
+
+
+
