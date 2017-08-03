@@ -13,7 +13,7 @@ import argparse
 import datetime
 import pyiqfeed as iq
 import time
-from passwords import dtn_product_id, dtn_login, dtn_password
+from localconfig import dtn_product_id, dtn_login, dtn_password
 
 
 def launch_service():
