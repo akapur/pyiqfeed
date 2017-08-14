@@ -62,9 +62,6 @@ from .exceptions import NoDataError, UnexpectedField, UnexpectedMessage
 from .exceptions import UnexpectedProtocol, UnauthorizedError
 from . import field_readers as fr
 
-import logging
-logger = logging.getLogger(__name__)
-
 
 class FeedConn:
     """

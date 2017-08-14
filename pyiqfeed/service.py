@@ -35,10 +35,10 @@ import time
 import socket
 import select
 import subprocess
-
 import logging
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 
 def _is_iqfeed_running():
@@ -141,6 +141,9 @@ class FeedService:
                     time.sleep(1)
                     if time.time() - start_time > timeout:
                         raise RuntimeError("Launching IQFeed timed out.")
+        else:
+            log.warning(
+                "Not launching IQFeed.exe because it is already running.")
 
     def admin_variables(self):
         """Return a dict of admin variables used to launch"""

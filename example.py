@@ -23,7 +23,7 @@ def launch_service():
                          version="Debugging",
                          login=dtn_login,
                          password=dtn_password)
-    svc.launch()
+    svc.launch(headless=True)
 
     # If you are running headless comment out the line above and uncomment
     # the line below instead. This runs IQFeed.exe using the xvfb X Framebuffer
