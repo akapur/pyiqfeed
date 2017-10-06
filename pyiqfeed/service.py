@@ -43,9 +43,15 @@ log.addHandler(logging.NullHandler())
 
 def _is_iqfeed_running():
     """Return True if a socket can connect to the IQFeed Admin Port."""
-    iqfeed_host = "127.0.0.1"
+    iqfeed_host = os.environ['IQFEED_HOST'] or "127.0.0.1"
+    quote_port = int(os.environ['IQFEED_PORT_QUOTE']) or 5009
+    lookup_port = int(os.environ['IQFEED_PORT_LOOKUP']) or 9100
+    depth_port = int(os.environ['IQFEED_PORT_DEPTH']) or 9200
+    admin_port = int(os.environ['IQFEED_PORT_ADMIN']) or 9300
+    deriv_port = int(os.environ['IQFEED_PORT_DERIV']) or 9400
+    
     # Admin port is first since that is ready first
-    iqfeed_ports = [9300, 5009, 9100, 9200, 9400]
+    iqfeed_ports = [admin_port, quote_port, lookup_port, depth_port, deriv_port]
 
     try:
         for port in iqfeed_ports:
