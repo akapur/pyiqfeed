@@ -45,6 +45,7 @@ which you can get from QuoteConn) and full news stories from the story id.
 See http://www.iqfeed.net/dev/main.cfm for more information.
 """
 
+import os
 import datetime
 import itertools
 import select
@@ -73,12 +74,12 @@ class FeedConn:
     """
 
     protocol = "5.2"
-    host = "127.0.0.1"
-    quote_port = 5009
-    lookup_port = 9100
-    depth_port = 9200
-    admin_port = 9300
-    deriv_port = 9400
+    host = os.environ['IQFEED_HOST'] or "127.0.0.1"
+    quote_port = int(os.environ['IQFEED_PORT_QUOTE']) or 5009
+    lookup_port = int(os.environ['IQFEED_PORT_LOOKUP']) or 9100
+    depth_port = int(os.environ['IQFEED_PORT_DEPTH']) or 9200
+    admin_port = int(os.environ['IQFEED_PORT_ADMIN']) or 9300
+    deriv_port = int(os.environ['IQFEED_PORT_DERIV']) or 9400
 
     port = quote_port
 
