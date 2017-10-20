@@ -9,7 +9,7 @@ setup(
     description='Handles connections to IQFeed, the market data feed by DTN',
     url='https://github.com/akapur/pyiqfeed',
     author='Ashwin Kapur',
-    author_email='akapur@amvirk.com',
+    author_email='ashwin.kapur@gmail.com',
     license='GPL v2',
     packages=['pyiqfeed'],
     zip_safe=False, install_requires=['numpy'])
