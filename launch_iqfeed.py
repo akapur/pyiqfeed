@@ -4,7 +4,7 @@
 """
 This is an example that launches IQConnect.exe.
 
-You need a file called localconfig.py (described in README.md that can be
+You need a file called passwords.py (described in README.md that can be
 imported here.
 
 This code just launches IQConnect.exe and returns.

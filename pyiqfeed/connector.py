@@ -25,7 +25,7 @@ class ConnConnector:
     Allows calling connect and disconnect on a list of XXXConn objects using a
     context manager, ie using with syntax.
 
-    So if you have a QuoteConn object calld qc and and AdminConn object
+    So if you have a QuoteConn object called qc and and AdminConn object
     called ac, instead of calling the connect() method on qc and ac and then
     disconnect() at the end you can simply do
 
@@ -33,7 +33,7 @@ class ConnConnector:
         do_something()
         do_something_else()
 
-    and when you leave the scope disconnect is called automaticaly even if an
+    and when you leave the scope disconnect is called automatically even if an
     exception is thrown.
 
     """

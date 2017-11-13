@@ -45,6 +45,7 @@ which you can get from QuoteConn) and full news stories from the story id.
 See http://www.iqfeed.net/dev/main.cfm for more information.
 """
 
+import os
 import datetime
 import itertools
 import select
@@ -73,23 +74,16 @@ class FeedConn:
     """
 
     protocol = "5.2"
-    host = "127.0.0.1"
-    quote_port = 5009
-    lookup_port = 9100
-    depth_port = 9200
-    admin_port = 9300
-    deriv_port = 9400
 
+    iqfeed_host = os.getenv('IQFEED_HOST') or "127.0.0.1"
+    quote_port = int(os.getenv('IQFEED_PORT_QUOTE') or 5009)
+    lookup_port = int(os.getenv('IQFEED_PORT_LOOKUP') or 9100)
+    depth_port = int(os.getenv('IQFEED_PORT_DEPTH') or 9200)
+    admin_port = int(os.getenv('IQFEED_PORT_ADMIN') or 9300)
+    deriv_port = int(os.getenv('IQFEED_PORT_DERIV') or 9400)
+
+    host = iqfeed_host
     port = quote_port
-
-    ConnStatsMsg = namedtuple('ConnStatsMsg', (
-        'server_ip', 'server_port', 'max_sym', 'num_sym', 'num_clients',
-        'secs_since_update', 'num_recon', 'num_fail_recon', 'conn_tm', 'mkt_tm',
-        'status', 'feed_version', 'login', 'kbs_recv', 'kbps_recv',
-        'avg_kbps_recv',
-        'kbs_sent', 'kbps_sent', 'avg_kbps_sent'))
-
-    TimeStampMsg = namedtuple("TimeStampMsg", ("date", "time"))
 
     def __init__(self, name: str, host: str, port: int):
         self._host = host
@@ -355,11 +349,20 @@ class FeedConn:
             listener.feed_is_stale()
             listener.feed_has_error()
 
+    ConnStatsMsg = namedtuple('ConnStatsMsg', (
+        'server_ip', 'server_port', 'max_sym', 'num_sym', 'num_clients',
+        'secs_since_update', 'num_recon', 'num_fail_recon', 'conn_tm', 'mkt_tm',
+        'status', 'feed_version', 'login', 'kbs_recv', 'kbps_recv',
+        'avg_kbps_recv',
+        'kbs_sent', 'kbps_sent', 'avg_kbps_sent'))
+
     def _process_conn_stats(self, fields: Sequence[str]) -> None:
         """Parse and send ConnStatsMsg to listener."""
         assert len(fields) > 20
         assert fields[0] == "S"
         assert fields[1] == "STATS"
+
+        # noinspection PyCallByClass
         conn_stats = FeedConn.ConnStatsMsg(
             server_ip=fields[2],
             server_port=fr.read_int(fields[3]),
@@ -384,6 +387,8 @@ class FeedConn:
             avg_kbps_sent=fr.read_float(fields[20]))
         for listener in self._listeners:
             listener.process_conn_stats(conn_stats)
+
+    TimeStampMsg = namedtuple("TimeStampMsg", ("date", "time"))
 
     def _process_timestamp(self, fields: Sequence[str]) -> None:
         """Parse timestamp and send to listener."""
@@ -705,10 +710,6 @@ class QuoteConn(FeedConn):
         "story_id", "distributor", "symbol_list",
         "story_date", "story_time", "headline"))
 
-    CustomerInfoMsg = namedtuple("CustomerInfoMsg", (
-        "svc_type", "ip_address", "port", "token", "version", "rt_exchanges",
-        "max_symbols", "flags"))
-
     def __init__(self, name: str = "QuoteConn", host: str = FeedConn.host,
                  port: int = port):
         super().__init__(name, host, port)
@@ -785,6 +786,7 @@ class QuoteConn(FeedConn):
         symbol_list = fields[3].split(":")
         story_date, story_time = fr.read_live_news_timestamp(fields[4])
         headline = fields[5]
+        # noinspection PyCallByClass
         news = QuoteConn.NewsMsg(
                 story_id=story_id,
                 distributor=distributor,
@@ -917,16 +919,25 @@ class QuoteConn(FeedConn):
         for listener in self._listeners:
             listener.process_keyok()
 
+    CustomerInfoMsg = namedtuple("CustomerInfoMsg", (
+        "svc_type", "ip_address", "port", "token", "version", "rt_exchanges",
+        "max_symbols", "flags"))
+
     def _process_customer_info(self, fields: Sequence[str]) -> None:
         """Handle a customer information message."""
         assert len(fields) > 11
         assert fields[0] == 'S'
         assert fields[1] == "CUST"
+        # noinspection PyCallByClass
         cust_info = QuoteConn.CustomerInfoMsg(
-                svc_type=(fields[2] == "real_time"), ip_address=fields[3],
-                port=int(fields[4]), token=fields[5], version=fields[6],
-                rt_exchanges=fields[8].split(" "), max_symbols=int(fields[10]),
-                flags=fields[11])
+            svc_type=(fields[2] == "real_time"),
+            ip_address=fields[3],
+            port=int(fields[4]),
+            token=fields[5],
+            version=fields[6],
+            rt_exchanges=fields[8].split(" "),
+            max_symbols=int(fields[10]),
+            flags=fields[11])
         for listener in self._listeners:
             listener.process_customer_info(cust_info)
 
@@ -1341,11 +1352,6 @@ class AdminConn(FeedConn):
     port = FeedConn.admin_port
     host = FeedConn.host
 
-    ClientStatsMsg = namedtuple("ClientStatsMsg", (
-        "client_type", "client_id", "client_name", "start_dt", "start_tm",
-        "kb_sent", "kb_recvd", "kb_queued", "num_quote_subs", "num_reg_subs",
-        "num_depth_subs"))
-
     def __init__(self, name: str = "AdminConn", host: str = host,
                  port: int = port):
         super().__init__(name, host, port)
@@ -1444,6 +1450,11 @@ class AdminConn(FeedConn):
         for listener in self._listeners:
             listener.process_autoconnect_off()
 
+    ClientStatsMsg = namedtuple("ClientStatsMsg", (
+        "client_type", "client_id", "client_name", "start_dt", "start_tm",
+        "kb_sent", "kb_recvd", "kb_queued", "num_quote_subs", "num_reg_subs",
+        "num_depth_subs"))
+
     def _process_client_stats(self, fields: Sequence[str]) -> None:
         """Client statistics for a specific connection."""
         assert len(fields) > 10
@@ -1480,6 +1491,7 @@ class AdminConn(FeedConn):
         elif 2 == type_int:
             num_depth_subs = num_sym
 
+        # noinspection PyCallByClass
         client_stats = AdminConn.ClientStatsMsg(
             client_type=client_type,
             client_id=client_id, client_name=client_name,
@@ -2960,7 +2972,7 @@ class LookupConn(FeedConn):
             fr.blob_to_str(years),
             fr.blob_to_str(near_months),
             req_id)
-        logging.info("Req Futures Option Chain: %s" % req_cmd)
+
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_option_chain(req_id)

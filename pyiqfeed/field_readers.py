@@ -99,8 +99,7 @@ def read_float64(field: str) -> np.float64:
     return np.float64(field) if field != "" else np.nan
 
 
-def read_split_string(split_str: str) -> Tuple[np.float64,
-                                                      np.datetime64]:
+def read_split_string(split_str: str) -> Tuple[np.float64, np.datetime64]:
     """Read a field that encodes the last split date and last split factor."""
     split_fld_0, split_fld_1 = ("", "")
     if split_str != "":

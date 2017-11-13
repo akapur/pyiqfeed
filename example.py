@@ -13,7 +13,7 @@ import argparse
 import datetime
 import pyiqfeed as iq
 import time
-from localconfig import dtn_product_id, dtn_login, dtn_password
+from passwords import dtn_product_id, dtn_login, dtn_password
 
 
 def launch_service():
@@ -23,7 +23,7 @@ def launch_service():
                          version="Debugging",
                          login=dtn_login,
                          password=dtn_password)
-    svc.launch(headless=True)
+    svc.launch(headless=False)
 
     # If you are running headless comment out the line above and uncomment
     # the line below instead. This runs IQFeed.exe using the xvfb X Framebuffer
@@ -422,10 +422,10 @@ if __name__ == "__main__":
     if results.reference_data:
         get_reference_data()
     if results.lookups_and_chains:
-        get_ticker_lookups("SPH9GBM1")
+        get_ticker_lookups("SPY")
         get_equity_option_chain("SPY")
         get_futures_chain("@VX")
         get_futures_spread_chain("@VX")
-        get_futures_options_chain("CL")
+        # get_futures_options_chain("@VX")
     if results.news:
         get_news()

@@ -65,7 +65,7 @@ passwords.py. In this file you need 3 lines:
  </code> </pre>
  
 3. Run example.py using something like python3 ./example.py. You must
-use python 3.5.
+use python ver >= 3.5.
 
 This exercises many different parts of the library depending on what
 options you pass it. The best documentation for the library is just

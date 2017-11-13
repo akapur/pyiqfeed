@@ -28,7 +28,6 @@ connected to it because once the last app disconnects, IQFeed.exe exits.
 
 """
 
-
 import os
 import sys
 import time
@@ -36,17 +35,27 @@ import socket
 import select
 import subprocess
 import logging
+from typing import Sequence
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-def _is_iqfeed_running():
-    """Return True if a socket can connect to the IQFeed Admin Port."""
-    iqfeed_host = "127.0.0.1"
-    # Admin port is first since that is ready first
-    iqfeed_ports = [9300, 5009, 9100, 9200, 9400]
+def _is_iqfeed_running(
+        iqfeed_host: str="127.0.0.1",
+        iqfeed_ports: Sequence=(9300, 5009, 9100, 9200, 9400)) -> bool:
+    """
+    Return true if you can connect to iqfeed_sockets
 
+    Make sure the admin_port is the first port in iqfeed_ports.The admin
+    port starts listening first. You need not list all ports if you are sure
+    you won't be talking to some of them.
+
+    :param iqfeed_host: The host on which IQFeed is running
+    :param iqfeed_ports:
+    :return: True if IQFeed is running
+
+    """
     try:
         for port in iqfeed_ports:
             s = socket.create_connection((iqfeed_host, port), 5)
@@ -71,6 +80,11 @@ class FeedService:
     Launch checks if IQConnect.exe is running and only starts a new instance
     if it isn't already running.
 
+    :param product: The Product ID given to you by DTN
+    :param version: The version of YOUR APP. Not the version of IQFeed.
+    :param login: Your IQFeed Service Login
+    :param password: Your IQFeed Service Password
+
     """
 
     def __init__(self,
@@ -78,25 +92,31 @@ class FeedService:
                  version: str,
                  login: str,
                  password: str):
-        """
-        Initialize the FeedService class.
 
-        :param product: The Product ID given to you by DTN
-        :param version: The version of YOUR APP. Not the version of IQFeed.
-        :param login: Your IQFeed Service Login
-        :param password: Your IQFeed Service Password
-
-        """
         self.product = product
         self.version = version
         self.login = login
         self.password = password
 
+        self.iqfeed_host = os.getenv('IQFEED_HOST') or "127.0.0.1"
+        quote_port = int(os.getenv('IQFEED_PORT_QUOTE') or 5009)
+        lookup_port = int(os.getenv('IQFEED_PORT_LOOKUP') or 9100)
+        depth_port = int(os.getenv('IQFEED_PORT_DEPTH') or 9200)
+        admin_port = int(os.getenv('IQFEED_PORT_ADMIN') or 9300)
+        deriv_port = int(os.getenv('IQFEED_PORT_DERIV') or 9400)
+
+        # Admin port is first since that is ready first
+        self.iqfeed_ports = (admin_port,
+                             quote_port,
+                             lookup_port,
+                             depth_port,
+                             deriv_port)
+
     def launch(self,
                timeout: int=20,
-               check_conn: bool = True,
-               headless: bool = False,
-               nohup: bool = True) -> None:
+               check_conn: bool=True,
+               headless: bool=False,
+               nohup: bool=True) -> None:
         """
         Launch IQConnect.exe if necessary
 
@@ -137,7 +157,8 @@ class FeedService:
                                  preexec_fn=os.setpgrp)
             if check_conn:
                 start_time = time.time()
-                while not _is_iqfeed_running():
+                while not _is_iqfeed_running(iqfeed_host=self.iqfeed_host,
+                                             iqfeed_ports=self.iqfeed_ports):
                     time.sleep(1)
                     if time.time() - start_time > timeout:
                         raise RuntimeError("Launching IQFeed timed out.")
