@@ -2189,6 +2189,20 @@ class HistoryConn(FeedConn):
             else:
                 raise RuntimeError(err_msg)
         else:
+            if datetime.date.today() not in data['date']:
+                try:
+                    daily = self.request_bars_for_days(ticker, 3600, 's', 1, ascend=True)
+                    day = np.empty(1, HistoryConn.daily_type)
+                    day[0]['date'] = daily[0]['date']
+                    day[0]['open_p'] = daily[0]['open_p']
+                    day[0]['close_p'] = daily[len(daily)-1]['close_p']
+                    day[0]['high_p'] = np.amax(daily['high_p'])
+                    day[0]['low_p'] = np.amin(daily['low_p'])
+                    day[0]['prd_vlm'] = daily[len(daily)-1]['tot_vlm']
+                    day[0]['open_int'] = 0
+                    data = np.append(day, data)
+                except Exception as e:
+                    print(e)
             return data
 
     def request_daily_data_for_dates(self, ticker: str, bgn_dt: datetime.date,
@@ -2269,6 +2283,23 @@ class HistoryConn(FeedConn):
             else:
                 raise RuntimeError(err_msg)
         else:
+            dayofweek = datetime.date.today().isoweekday()
+            if dayofweek < 6 and datetime.date.today() not in data['date']:
+                if dayofweek > 1:
+                    data = np.delete(data, 0)
+                try:
+                    daily = self.request_bars_for_days(ticker, 3600, 's', dayofweek, ascend=True)
+                    day = np.empty(1, HistoryConn.daily_type)
+                    day[0]['date'] = daily[len(daily)-1]['date']
+                    day[0]['open_p'] = daily[0]['open_p']
+                    day[0]['close_p'] = daily[len(daily)-1]['close_p']
+                    day[0]['high_p'] = np.amax(daily['high_p'])
+                    day[0]['low_p'] = np.amin(daily['low_p'])
+                    day[0]['prd_vlm'] = daily[len(daily)-1]['tot_vlm']
+                    day[0]['open_int'] = 0
+                    data = np.append(day, data)
+                except Exception as e:
+                    print(e)
             return data
 
     def request_monthly_data(self, ticker: str, num_months: int,
