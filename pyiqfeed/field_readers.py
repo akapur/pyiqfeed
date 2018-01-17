@@ -259,7 +259,7 @@ def str_or_blank(val) -> str:
 def us_since_midnight_to_time(
         us_dt: Union[int, np.datetime64]) -> datetime.time:
     """Convert us since midnight to datetime.time with rounding."""
-    us = us_dt.astype('int')
+    us = us_dt.astype('int64')
     assert us >= 0
     assert us <= 86400000000
     microsecond = us % 1000000
