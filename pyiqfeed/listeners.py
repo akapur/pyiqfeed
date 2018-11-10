@@ -300,10 +300,10 @@ class SilentAdminListener(SilentIQFeedListener):
 
         :param client_stats: Data in a ClientStatsMsg namedtuple
 
-        Each connection can be named so connections are distinguishable in these
-        messages. Pay particular attention to the kb_queued. If you aren't
-        reading data fast enough, IQFeed will drop your connection and of
-        course you are reacting to stale data.
+        Each connection can be named so connections are distinguishable in
+        these messages. Pay particular attention to the kb_queued. If you
+        aren't reading data fast enough, IQFeed will drop your connection and
+        of course you are reacting to stale data.
 
         """
         pass

@@ -55,8 +55,7 @@ import time
 
 from collections import deque, namedtuple
 from typing import Sequence, List
-# noinspection PyPep8Naming
-import xml.etree.ElementTree as etree
+import xml.etree.ElementTree as ElementTree
 
 import numpy as np
 from .exceptions import NoDataError, UnexpectedField, UnexpectedMessage
@@ -73,17 +72,20 @@ class FeedConn:
 
     """
 
-    protocol = "5.2"
+    protocol = "6.0"
 
-    iqfeed_host = os.getenv('IQFEED_HOST') or "127.0.0.1"
-    quote_port = int(os.getenv('IQFEED_PORT_QUOTE') or 5009)
-    lookup_port = int(os.getenv('IQFEED_PORT_LOOKUP') or 9100)
-    depth_port = int(os.getenv('IQFEED_PORT_DEPTH') or 9200)
-    admin_port = int(os.getenv('IQFEED_PORT_ADMIN') or 9300)
-    deriv_port = int(os.getenv('IQFEED_PORT_DERIV') or 9400)
+    iqfeed_host = os.getenv('IQFEED_HOST', "127.0.0.1")
+    quote_port = int(os.getenv('IQFEED_PORT_QUOTE', 5009))
+    lookup_port = int(os.getenv('IQFEED_PORT_LOOKUP', 9100))
+    depth_port = int(os.getenv('IQFEED_PORT_DEPTH', 9200))
+    admin_port = int(os.getenv('IQFEED_PORT_ADMIN', 9300))
+    deriv_port = int(os.getenv('IQFEED_PORT_DERIV', 9400))
 
     host = iqfeed_host
     port = quote_port
+
+    databuf = namedtuple(
+        "databuf", ('failed', 'err_msg', 'num_pts', 'raw_data'))
 
     def __init__(self, name: str, host: str, port: int):
         self._host = host
@@ -178,8 +180,7 @@ class FeedConn:
 
     def _send_cmd(self, cmd: str) -> None:
         with self._send_lock:
-            # noinspection PyArgumentEqualDefault
-            self._sock.sendall(cmd.encode(encoding='latin-1', errors='strict'))
+            self._sock.sendall(cmd.encode(encoding='latin-1'))
 
     def reconnect_failed(self) -> bool:
         """
@@ -349,12 +350,14 @@ class FeedConn:
             listener.feed_is_stale()
             listener.feed_has_error()
 
-    ConnStatsMsg = namedtuple('ConnStatsMsg', (
-        'server_ip', 'server_port', 'max_sym', 'num_sym', 'num_clients',
-        'secs_since_update', 'num_recon', 'num_fail_recon', 'conn_tm', 'mkt_tm',
-        'status', 'feed_version', 'login', 'kbs_recv', 'kbps_recv',
-        'avg_kbps_recv',
-        'kbs_sent', 'kbps_sent', 'avg_kbps_sent'))
+    ConnStatsMsg = namedtuple(
+        'ConnStatsMsg', (
+            'server_ip', 'server_port', 'max_sym', 'num_sym', 'num_clients',
+            'secs_since_update', 'num_recon', 'num_fail_recon',
+            'conn_tm', 'mkt_tm',
+            'status', 'feed_version', 'login',
+            'kbs_recv', 'kbps_recv', 'avg_kbps_recv',
+            'kbs_sent', 'kbps_sent', 'avg_kbps_sent'))
 
     def _process_conn_stats(self, fields: Sequence[str]) -> None:
         """Parse and send ConnStatsMsg to listener."""
@@ -396,6 +399,7 @@ class FeedConn:
         assert fields[0] == "T"
         assert len(fields) > 1
         dt_tm_tuple = fr.read_timestamp_msg(fields[1])
+        # noinspection PyCallByClass
         timestamp = FeedConn.TimeStampMsg(date=dt_tm_tuple[0],
                                           time=dt_tm_tuple[1])
         for listener in self._listeners:
@@ -606,9 +610,9 @@ class QuoteConn(FeedConn):
                          ('Ask Market Center', 'u1', fr.read_uint8),
                      'Ask Size': ('Ask Size', 'u8', fr.read_uint64),
                      'Ask Time': ('Ask Time', 'u8', fr.read_hhmmssus),
-                     # TODO: Parse:
                      'Available Regions':
                          ('Available Regions', 'S128', lambda x: x),
+                     # TODO: Parse:
                      'Average Maturity':
                          ('Average Maturity', 'f8', fr.read_float64),
                      'Bid': ('Bid', 'f8', fr.read_float64),
@@ -642,10 +646,11 @@ class QuoteConn(FeedConn):
                      'Extended Trading Change':
                          ('Extended Trading Change', 'f8', fr.read_float64),
                      'Extended Trading Difference':
-                         ('Extended Trading Difference', 'f8', fr.read_float64),
-                     # TODO: Parse:
+                         ('Extended Trading Difference', 'f8',
+                          fr.read_float64),
                      'Financial Status Indicator':
                          ('Financial Status Indicator', 'S1', lambda x: x),
+                     # TODO: Parse:
                      'Fraction Display Code':
                          ('Fraction Display Code', 'u1', fr.read_uint8),
                      'High': ('High', 'f8', fr.read_float64),
@@ -660,9 +665,9 @@ class QuoteConn(FeedConn):
                          ('Market Capitalization', 'f8', fr.read_float64),
                      'Market Open':
                          ('Market Open', 'b1', fr.read_is_market_open),
-                     # TODO: Parse:
                      'Message Contents':
                          ('Message Contents', 'S9', lambda x: x),
+                     # TODO: Parse:
                      'Most Recent Trade':
                          ('Most Recent Trade', 'f8', fr.read_float64),
                      'Most Recent Trade Conditions':
@@ -695,7 +700,8 @@ class QuoteConn(FeedConn):
                          ('Price-Earnings Ratio', 'f8', fr.read_float64),
                      'Range': ('Range', 'f8', fr.read_float64),
                      'Restricted Code':
-                         ('Restricted Code', 'b1', fr.read_is_short_restricted),
+                         ('Restricted Code', 'b1',
+                          fr.read_is_short_restricted),
                      'Settle': ('Settle', 'f8', fr.read_float64),
                      'Settlement Date':
                          ('Settlement Date', 'M8[D]', fr.read_mmddccyy),
@@ -706,9 +712,10 @@ class QuoteConn(FeedConn):
                      'Volatility': ('Volatility', 'f8', fr.read_float64),
                      'VWAP': ('VWAP', 'f8', fr.read_float64)}
 
-    NewsMsg = namedtuple("NewsMsg", (
-        "story_id", "distributor", "symbol_list",
-        "story_date", "story_time", "headline"))
+    NewsMsg = namedtuple(
+        "NewsMsg", (
+            "story_id", "distributor", "symbol_list",
+            "story_date", "story_time", "headline"))
 
     def __init__(self, name: str = "QuoteConn", host: str = FeedConn.host,
                  port: int = port):
@@ -919,9 +926,12 @@ class QuoteConn(FeedConn):
         for listener in self._listeners:
             listener.process_keyok()
 
-    CustomerInfoMsg = namedtuple("CustomerInfoMsg", (
-        "svc_type", "ip_address", "port", "token", "version", "rt_exchanges",
-        "max_symbols", "flags"))
+    CustomerInfoMsg = namedtuple(
+        "CustomerInfoMsg", (
+            "svc_type", "ip_address", "port",
+            "token", "version",
+            "rt_exchanges", "max_symbols",
+            "flags"))
 
     def _process_customer_info(self, fields: Sequence[str]) -> None:
         """Handle a customer information message."""
@@ -1014,8 +1024,8 @@ class QuoteConn(FeedConn):
                     (field, self.name()))
                 raise UnexpectedField(err_msg)
 
-    def _process_current_update_fieldnames(self, fields: Sequence[str]) -> \
-            None:
+    def _process_current_update_fieldnames(
+            self, fields: Sequence[str]) -> None:
         """
         IQFeed has accepted our update fieldnames request.
 
@@ -1450,10 +1460,12 @@ class AdminConn(FeedConn):
         for listener in self._listeners:
             listener.process_autoconnect_off()
 
-    ClientStatsMsg = namedtuple("ClientStatsMsg", (
-        "client_type", "client_id", "client_name", "start_dt", "start_tm",
-        "kb_sent", "kb_recvd", "kb_queued", "num_quote_subs", "num_reg_subs",
-        "num_depth_subs"))
+    ClientStatsMsg = namedtuple(
+        "ClientStatsMsg", (
+            "client_type", "client_id", "client_name",
+            "start_dt", "start_tm",
+            "kb_sent", "kb_recvd", "kb_queued",
+            "num_quote_subs", "num_reg_subs", "num_depth_subs"))
 
     def _process_client_stats(self, fields: Sequence[str]) -> None:
         """Client statistics for a specific connection."""
@@ -1685,10 +1697,6 @@ class HistoryConn(FeedConn):
              ('low_p', 'f8'), ('close_p', 'f8'), ('prd_vlm', 'u8'),
              ('open_int', 'u8')])
 
-    # Private data structure
-    _databuf = namedtuple("_databuf",
-                          ['failed', 'err_msg', 'num_pts', 'raw_data'])
-
     def __init__(self, name: str = "HistoryConn", host: str = FeedConn.host,
                  port: int = port):
         super().__init__(name, host, port)
@@ -1749,10 +1757,10 @@ class HistoryConn(FeedConn):
             self._req_err[req_id] = ""
             self._req_event[req_id] = threading.Event()
 
-    def _get_data_buf(self, req_id: str) -> namedtuple:
+    def _get_data_buf(self, req_id: str) -> FeedConn.databuf:
         """Get the data buffer associated with a specific request."""
         with self._req_lock:
-            buf = HistoryConn._databuf(
+            buf = FeedConn.databuf(
                 failed=self._req_failed[req_id],
                 err_msg=self._req_err[req_id],
                 num_pts=self._req_numlines[req_id],
@@ -1972,8 +1980,13 @@ class HistoryConn(FeedConn):
                     assert line_num >= res.num_pts
             return data
 
-    def request_bars(self, ticker: str, interval_len: int, interval_type: str,
-                     max_bars: int, ascend: bool = False,
+    def request_bars(self,
+                     ticker: str,
+                     interval_len: int,
+                     interval_type: str,
+                     max_bars: int,
+                     ascend: bool = False,
+                     label_at_begin=False,
                      timeout: int = None) -> np.array:
         """
         Get max_bars number of bars of bar_data from IQFeed.
@@ -1983,6 +1996,7 @@ class HistoryConn(FeedConn):
         :param interval_type: 's' = secs, 'v' = volume, 't' = ticks
         :param max_bars: Only the most recent max_bars bars. Default None
         :param ascend: True means oldest to latest, False opposite.
+        :param label_at_begin: Is the timestamp the beginning or end of the bar
         :param timeout: Wait no more than timeout secs. Default None
         :return: A numpy array with dtype HistoryConn.bar_type
 
@@ -1995,16 +2009,16 @@ class HistoryConn(FeedConn):
         you may be better off getting tick-data and creating your own bars.
 
         HIX,[Symbol],[Interval],[MaxDatapoints],[DataDirection],[RequestID],
-        [DatapointsPerSend],[IntervalType]<CR><LF>
+        [DatapointsPerSend],[IntervalType],[LabelAtBeginning]<CR><LF>
 
         """
         assert interval_type in ('s', 'v', 't')
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
         bars_per_batch = min((100, max_bars))
-        req_cmd = ("HIX,%s,%d,%d,%d,%s,%d,%s\r\n" % (
+        req_cmd = ("HIX,%s,%d,%d,%d,%s,%d,%s,%d\r\n" % (
             ticker, interval_len, max_bars, ascend, req_id, bars_per_batch,
-            interval_type))
+            interval_type, label_at_begin))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2020,12 +2034,16 @@ class HistoryConn(FeedConn):
         else:
             return data
 
-    def request_bars_for_days(self, ticker: str, interval_len: int,
-                              interval_type: str, days: int,
-                              bgn_flt: datetime.time = None,
-                              end_flt: datetime.time = None,
-                              ascend: bool = False, max_bars: int = None,
-                              timeout: int = None) -> np.array:
+    def request_bars_for_days(self, ticker: str,
+                              interval_len: int,
+                              interval_type: str,
+                              days: int,
+                              bgn_flt: datetime.time=None,
+                              end_flt: datetime.time=None,
+                              ascend: bool=False,
+                              max_bars: int=None,
+                              label_at_begin: bool=False,
+                              timeout: int=None) -> np.array:
         """
         Get bars for the previous N days.
 
@@ -2037,6 +2055,7 @@ class HistoryConn(FeedConn):
         :param end_flt: Each day's data no later than end_flt
         :param ascend: True means latest to oldest, False opposite.
         :param max_bars: Only the most recent max_bars bars. Default None
+        :param label_at_begin: Is the timestamp the beginning of end of the bar
         :param timeout: Wait no more than timeout secs. Default None
         :return: A numpy array with dtype HistoryConn.bar_type
 
@@ -2050,7 +2069,7 @@ class HistoryConn(FeedConn):
 
         HID,[Symbol],[Interval],[Days],[MaxDatapoints],[BeginFilterTime],
         [EndFilterTime],[DataDirection],[RequestID],[DatapointsPerSend],
-        [IntervalType]<CR><LF>
+        [IntervalType],[LabelAtBeginning]<CR><LF>
 
         """
         assert interval_type in ('s', 'v', 't')
@@ -2062,9 +2081,9 @@ class HistoryConn(FeedConn):
         bars_per_batch = 100
         if max_bars is not None:
             bars_per_batch = min((100, max_bars))
-        req_cmd = "HID,%s,%d,%d,%s,%s,%s,%d,%s,%d,%s\r\n" % (
+        req_cmd = "HID,%s,%d,%d,%s,%s,%s,%d,%s,%d,%s,%d\r\n" % (
             ticker, interval_len, days, mb_str, bf_str, ef_str, ascend, req_id,
-            bars_per_batch, interval_type)
+            bars_per_batch, interval_type, label_at_begin)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2086,6 +2105,7 @@ class HistoryConn(FeedConn):
                                bgn_flt: datetime.time = None,
                                end_flt: datetime.time = None,
                                ascend: bool = False, max_bars: int = None,
+                               label_at_beginning: bool=False,
                                timeout: int = None) -> np.array:
         """
         Get bars for a specific period.
@@ -2099,6 +2119,7 @@ class HistoryConn(FeedConn):
         :param end_flt: Each day's data no later than end_flt
         :param ascend: True means oldest to latest, False opposite.
         :param max_bars: Only the most recent max_bars bars. Default None.
+        :param label_at_beginning: Is the timestamp the begin or end of the bar
         :param timeout: Wait no more than timeout secs. Default None
         :return: A numpy array with dtype HistoryConn.bar_type
 
@@ -2112,7 +2133,8 @@ class HistoryConn(FeedConn):
 
         HIT,[Symbol],[Interval],[BeginDate BeginTime],[EndDate EndTime],
         [MaxDatapoints],[BeginFilterTime],[EndFilterTime],[DataDirection],
-        [RequestID],[DatapointsPerSend],[IntervalType]<CR><LF>
+        [RequestID],[DatapointsPerSend],[IntervalType],
+        [LabelAtBeginning]<CR><LF>
 
         """
         assert interval_type in ('s', 'v', 't')
@@ -2126,9 +2148,9 @@ class HistoryConn(FeedConn):
         bars_per_batch = 100
         if max_bars is not None:
             bars_per_batch = min((100, max_bars))
-        req_cmd = ("HIT,%s,%d,%s,%s,%s,%s,%s,%d,%s,%d,%s\r\n" % (
+        req_cmd = ("HIT,%s,%d,%s,%s,%s,%s,%s,%d,%s,%d,%s,%d\r\n" % (
             ticker, interval_len, bp_str, ep_str, mb_str, bf_str, ef_str,
-            ascend, req_id, bars_per_batch, interval_type))
+            ascend, req_id, bars_per_batch, interval_type, label_at_beginning))
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_bars(req_id)
@@ -2601,9 +2623,6 @@ class LookupConn(FeedConn):
             [('symbol', 'S128'), ('market', 'u1'), ('security_type', 'u1'),
              ('name', 'S128'), ('sector', 'u8')])
 
-    _databuf = namedtuple("_databuf",
-                          ['failed', 'err_msg', 'num_pts', 'raw_data'])
-
     def __init__(self, name: str = "SymbolSearchConn",
                  host: str = FeedConn.host, port: int = port):
         super().__init__(name, host, port)
@@ -2661,10 +2680,10 @@ class LookupConn(FeedConn):
             self._req_err[req_id] = ""
             self._req_event[req_id] = threading.Event()
 
-    def _get_data_buf(self, req_id: str) -> namedtuple:
+    def _get_data_buf(self, req_id: str) -> FeedConn.databuf:
         """Get the data buffer for a specific request."""
         with self._req_lock:
-            buf = LookupConn._databuf(
+            buf = FeedConn.databuf(
                     failed=self._req_failed[req_id],
                     err_msg=self._req_err[req_id],
                     num_pts=self._req_numlines[req_id],
@@ -3273,9 +3292,6 @@ class NewsConn(FeedConn):
     host = FeedConn.host
     port = FeedConn.lookup_port
 
-    _databuf = namedtuple("_databuf",
-                          ('failed', 'err_msg', 'num_pts', 'raw_data'))
-
     # Same as real-time news updates
     NewsMsg = namedtuple("NewsMsg",
                          ("story_id", "distributor", "symbol_list",
@@ -3342,9 +3358,9 @@ class NewsConn(FeedConn):
             self._req_err[req_id] = ""
             self._req_event[req_id] = threading.Event()
 
-    def _get_data_buf(self, req_id: str) -> namedtuple:
+    def _get_data_buf(self, req_id: str) -> FeedConn.databuf:
         with self._req_lock:
-            buf = NewsConn._databuf(
+            buf = FeedConn.databuf(
                     failed=self._req_failed[req_id],
                     err_msg=self._req_err[req_id],
                     num_pts=self._req_numlines[req_id],
@@ -3359,9 +3375,9 @@ class NewsConn(FeedConn):
             return np.array([res.err_msg], dtype='object')
         else:
             raw_text = '\n'.join([''.join(line[1:]) for line in res.raw_data])
-            return etree.fromstring(raw_text)
+            return ElementTree.fromstring(raw_text)
 
-    def _create_config_structure(self, xml_data: etree.Element) -> dict:
+    def _create_config_structure(self, xml_data: ElementTree.Element) -> dict:
         """Convert et.Element of configuration into nested list"""
         structure = xml_data.attrib
         structure["elem_type"] = xml_data.tag
@@ -3399,7 +3415,7 @@ class NewsConn(FeedConn):
         return self._create_config_structure(xml_data)
 
     @staticmethod
-    def _create_headline_list(xml_data: etree.Element) -> List[NewsMsg]:
+    def _create_headline_list(xml_data: ElementTree.Element) -> List[NewsMsg]:
         """Parse Headlines formatted as XML."""
         news_headlines = []
         for cur_headline in xml_data:
@@ -3494,7 +3510,7 @@ class NewsConn(FeedConn):
         return self._create_headline_list(xml_data)
 
     @staticmethod
-    def _create_news_story(xml_data: etree.Element) -> NewsStoryMsg:
+    def _create_news_story(xml_data: ElementTree.Element) -> NewsStoryMsg:
         """Convert news stories into NewsStoryMsgs."""
         is_link = 'N'
         story = None
@@ -3555,7 +3571,7 @@ class NewsConn(FeedConn):
         self._send_cmd(req_cmd)
 
     @staticmethod
-    def _create_story_counts(xml_data: etree.Element) -> List[NewsCountMsg]:
+    def _create_story_counts(xml_data: ElementTree.Element) -> List[NewsCountMsg]:
         """Parse story counts and return as NewsCountMsg."""
         story_counts = []
         for count_data in xml_data:

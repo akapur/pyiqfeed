@@ -1,6 +1,16 @@
 # pyiqfeed 
 
-Reads and parses data from IQFeed (http://www.iqfeed.net).
+Reads and parses data from IQFeed (http://www.iqfeed.net). Now supports
+API version 6.0.
+
+***NOTE: If you would like continued development of this library, please
+email me your DTN IQFeed usernames. I am trying to get DTN to offer me
+free access to their API documents which are only available for payment
+of an annual fee and they have refused unless I demonstrate that I am
+bringing them other customers. Note, I am not asking them for any payment
+or free access to data, simply free access to their API docs. Emailing
+them and telling them that they should be providing me free access would
+be appreciated too.***
 
 You likely want DTN's API docs handy. They are available at:
 
