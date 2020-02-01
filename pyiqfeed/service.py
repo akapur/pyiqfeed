@@ -112,6 +112,8 @@ class FeedService:
                              depth_port,
                              deriv_port)
 
+        self.iqconnect_process = None
+
     def launch(self,
                timeout: int=20,
                check_conn: bool=True,
@@ -149,12 +151,14 @@ class FeedService:
                 iqfeed_call = prefix_str + base_iqfeed_call
 
                 logging.info("Running %s" % iqfeed_call)
-                subprocess.Popen(iqfeed_call,
-                                 shell=True,
-                                 stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL,
-                                 preexec_fn=os.setpgrp)
+                self.iqconnect_process = subprocess.Popen(
+                    iqfeed_call,
+                    shell=True,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    preexec_fn=os.setpgrp)
+
             if check_conn:
                 start_time = time.time()
                 while not _is_iqfeed_running(iqfeed_host=self.iqfeed_host,
