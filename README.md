@@ -65,8 +65,8 @@ For an example of how to use it do the following:
 1. Install the package or put it in your search path. python setup.py
 works.
 
-2. Create a file in the same directory as example.py called
-passwords.py. In this file you need 3 lines:
+2. Create a folder in the same directory as example.py named localconfig and place a file named
+passwords.py in it. In this file you need 3 lines:
 
 <pre> <code>
  dtn_product_id = "PRODUCT_ID_FROM_DTN"
