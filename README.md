@@ -3,15 +3,6 @@
 Reads and parses data from IQFeed (http://www.iqfeed.net). Now supports
 API version 6.0.
 
-***NOTE: If you would like continued development of this library, please
-email me your DTN IQFeed usernames. I am trying to get DTN to offer me
-free access to their API documents which are only available for payment
-of an annual fee and they have refused unless I demonstrate that I am
-bringing them other customers. Note, I am not asking them for any payment
-or free access to data, simply free access to their API docs. Emailing
-them and telling them that they should be providing me free access would
-be appreciated too.***
-
 You likely want DTN's API docs handy. They are available at:
 
 https://www.iqfeed.net/dev/api/docs/index.cfm
@@ -58,7 +49,11 @@ You cannot install IQFeed in a Windows Virtual Machine on the same
 physical machine. It won't work unless you subscribe to data while
 running within the same virtual machine. DTN does not allow you to get
 data on a machine other than the one that IQConnect.exe is running on,
-even if it's the same physical machine.
+even if it's the same physical machine. IQFeed.exe listens on 127.0.0.1.
+So if you absolutely must run it in a virtual machine and run code that
+talks to IQFeed on the main machine or vice-versa, there are ways to
+make it work. But please **DO NOT** ask me how to do it for you. Hint:
+Tunneling or run something on the same machine to forward requests.
 
 For an example of how to use it do the following:
 
