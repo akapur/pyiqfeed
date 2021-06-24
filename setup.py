@@ -1,6 +1,6 @@
 # coding=utf-8
 """Install pyiqfeed into your library path."""
-
+import setuptools
 from setuptools import setup
 
 setup(
@@ -11,5 +11,7 @@ setup(
     author='Ashwin Kapur',
     author_email='ashwin.kapur@gmail.com',
     license='GPL v2',
-    packages=['pyiqfeed'],
-    zip_safe=False, install_requires=['numpy'])
+    packages=setuptools.find_packages(),
+    install_requires=['numpy~=1.20.2'],
+
+)
