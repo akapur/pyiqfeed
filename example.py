@@ -400,30 +400,31 @@ if __name__ == "__main__":
 
     launch_service()
 
+    test_ticker = "SPY"
     if results.level_1:
-        get_level_1_quotes_and_trades(ticker="SPY", seconds=30)
+        get_level_1_quotes_and_trades(ticker=test_ticker, seconds=30)
     if results.regional_quotes:
-        get_regional_quotes(ticker="SPY", seconds=120)
+        get_regional_quotes(ticker=test_ticker, seconds=120)
     if results.trade_updates:
-        get_trades_only(ticker="SPY", seconds=30)
+        get_trades_only(ticker=test_ticker, seconds=30)
     if results.interval_data:
-        get_live_interval_bars(ticker="SPY", bar_len=5, seconds=30)
+        get_live_interval_bars(ticker=test_ticker, bar_len=5, seconds=30)
     if results.admin_socket:
         get_administrative_messages(seconds=30)
     if results.historical_tickdata:
-        get_tickdata(ticker="SPY", max_ticks=100, num_days=4)
+        get_tickdata(ticker=test_ticker, max_ticks=100, num_days=4)
     if results.historical_bars:
-        get_historical_bar_data(ticker="SPY",
+        get_historical_bar_data(ticker=test_ticker,
                                 bar_len=60,
                                 bar_unit='s',
                                 num_bars=100)
     if results.historical_daily_data:
-        get_daily_data(ticker="SPY", num_days=10)
+        get_daily_data(ticker=test_ticker, num_days=10)
     if results.reference_data:
         get_reference_data()
     if results.lookups_and_chains:
-        get_ticker_lookups("SPY")
-        get_equity_option_chain("SPY")
+        get_ticker_lookups(test_ticker)
+        get_equity_option_chain(test_ticker)
         get_futures_chain("@VX")
         get_futures_spread_chain("@VX")
         # get_futures_options_chain("@VX")

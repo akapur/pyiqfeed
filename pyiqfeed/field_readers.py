@@ -32,7 +32,7 @@ def read_is_market_open(field: str) -> bool:
 def read_is_short_restricted(field: str) -> bool:
     """Return True if the stock cannot be sold short."""
     if field != "":
-        if field == 'Y':
+        if field == 'Y' or field == 'R':
             return True
         if field == 'N':
             return False
