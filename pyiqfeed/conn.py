@@ -1548,7 +1548,7 @@ class AdminConn(FeedConn):
         process_remove_client_app_completed called in listeners on success.
 
         """
-        self._send_cmd("S REMOVE CLIENT APP,%s\r\n" % product)
+        self._send_cmd("S,REMOVE CLIENT APP,%s\r\n" % product)
 
     def set_login(self, login: str) -> None:
         """
