@@ -2966,15 +2966,8 @@ class LookupConn(FeedConn):
         assert month_codes is not None or near_months is not None
 
         if month_codes is not None:
-            valid_month_codes = ()
-            if opt_type == 'p':
-                valid_month_codes = LookupConn.put_month_letters
-            elif opt_type == 'c':
-                valid_month_codes = LookupConn.call_month_letters
-            elif opt_type == 'cp' or opt_type == 'pc':
-                valid_month_codes = (
-                    LookupConn.call_month_letters +
-                    LookupConn.put_month_letters)
+            valid_month_codes = LookupConn.futures_month_letters 
+
             # noinspection PyTypeChecker
             for month_code in month_codes:
                 assert month_code in valid_month_codes
