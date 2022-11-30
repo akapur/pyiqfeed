@@ -72,7 +72,7 @@ class FeedConn:
 
     """
 
-    protocol = "6.0"
+    protocol = "6.1"
 
     iqfeed_host = os.getenv('IQFEED_HOST', "127.0.0.1")
     quote_port = int(os.getenv('IQFEED_PORT_QUOTE', 5009))
@@ -529,29 +529,8 @@ class QuoteConn(FeedConn):
                               ('Decimal Precision', 'u2')])
 
     # List of fields provided by IQFeed.exe in the fundamentals message.
-    fundamental_fields = ["Symbol", "Exchange ID", "PE", "Average Volume",
-                          "52 Week High", "52 Week Low", "Calendar Year High",
-                          "Calendar Year Low", "Dividend Yield",
-                          "Dividend Amount", "Dividend Rate", "Pay Date",
-                          "Ex-dividend Date", "(Reserved)", "(Reserved)",
-                          "(Reserved)", "Short Interest", "(Reserved)",
-                          "Current Year EPS", "Next Year EPS",
-                          "Five-year Growth Percentage", "Fiscal Year End",
-                          "(Reserved)", "Company Name", "Root Option Symbol",
-                          "Percent Held By Institutions", "Beta", "Leaps",
-                          "Current Assets", "Current Liabilities",
-                          "Balance Sheet Date", "Long-term Debt",
-                          "Common Shares Outstanding", "(Reserved)",
-                          "Split Factor 1", "Split Factor 2", "(Reserved)",
-                          "Market Center", "Format Code", "Precision", "SIC",
-                          "Historical Volatility", "Security Type",
-                          "Listed Market", "52 Week High Date",
-                          "52 Week Low Date", "Calendar Year High Date",
-                          "Calendar Year Low Date", "Year End Close",
-                          "Maturity Date", "Coupon Rate", "Expiration Date",
-                          "Strike Price", "NAICS", "Exchange Root",
-                          "Option Premium Multiplier",
-                          "Option Multiple Deliverable"]
+    fundamental_fields = ['Symbol', 'Exchange ID', 'PE', 'Average Volume', '52 Week High', '52 Week Low', 'Calendar Year High', 'Calendar Year Low', 'Dividend Yield', 'Dividend Amount', 'Dividend Rate', 'Pay Date', 'Ex-dividend Date', 'Current Year EPS', 'Next Year EPS', 'Five-year Growth Percentage', 'Fiscal Year End', 'Company Name', 'Root Option Symbol', 'Percent Held By Institutions', 'Beta', 'Leaps', 'Current Assets', 'Current Liabilities', 'Balance Sheet Date', 'Long-term Debt', 'Common Shares Outstanding', 'Split Factor 1', 'Split Factor 2', 'Format Code', 'Precision', 'SIC', 'Historical Volatility', 'Security Type', 'Listed Market', '52 Week High Date', '52 Week Low Date', 'Calendar Year High Date', 'Calendar Year Low Date', 'Year End Close', 'Maturity Date', 'Coupon Rate', 'Expiration Date', 'Strike Price', 'NAICS', 'Exchange Root', 'Option Premium Multiplier', 'Option Multiple Deliverable', 'Session Open Time', 'Session Close Time', 'Base Currency', 'Contract Size', 'Contract Months', 'Minimum Tick Size', 'First Delivery Date', 'FIGI', 'Security SubType']
+        
 
     # Type of numpy structured array used to return fundamental data.
     fundamental_type = [('Symbol', 'S128'), ('PE', 'f8'),
@@ -560,7 +539,7 @@ class QuoteConn(FeedConn):
                         ('Calendar Year Low', 'f8'), ('Dividend Yield', 'f8'),
                         ('Dividend Amount', 'f8'), ('Dividend Rate', 'f8'),
                         ('Pay Date', 'M8[D]'), ('Ex-dividend Date', 'M8[D]'),
-                        ('Short Interest', 'i8'), ('Current Year EPS', 'f8'),
+                        ('Current Year EPS', 'f8'),
                         ('Next Year EPS', 'f8'),
                         ('Five-year Growth Percentage', 'f8'),
                         ('Fiscal Year End', 'u1'), ('Company Name', 'S256'),
@@ -587,7 +566,16 @@ class QuoteConn(FeedConn):
                         ('Strike Price', 'f8'), ('NAICS', 'u8'),
                         ('Exchange Root', 'S128'),
                         ('Option Premium Multiplier', 'f8'),
-                        ('Option Multiple Deliverable', 'u8')]
+                        ('Option Multiple Deliverable', 'u8'),
+                        ("Session Open Time", 'S256'),
+                        ("Session Close Time", 'S256'),
+                        ("Base Currency", 'S256'),
+                        ("Contract Size", 'S256'),
+                        ("Contract Months", 'S256'),
+                        ("Minimum Tick Size", 'f8'),
+                        ("First Delivery Date", 'M8[D]'),
+                        ("FIGI", 'S256'),
+                        ("Security SubType", 'i8')]
 
     # For quote updates (provided when the top of book quote changes or a
     # trade happens) IQFeed.exe can send dynamic fieldsets. This means that
@@ -670,11 +658,13 @@ class QuoteConn(FeedConn):
                      # TODO: Parse:
                      'Most Recent Trade':
                          ('Most Recent Trade', 'f8', fr.read_float64),
+                     'Most Recent Trade Aggressor' : ('Trade Aggressor', 'u1', fr.read_uint8),
                      'Most Recent Trade Conditions':
                          ('Most Recent Trade Conditions', 'S16', lambda x: x),
                      # todo: Parse
                      'Most Recent Trade Date':
                          ('Most Recent Trade Date', 'M8[D]', fr.read_mmddccyy),
+                     'Most Recent Trade Day Code' : ('Day Code', 'u1', fr.read_uint8),
                      'Most Recent Trade Market Center':
                          ('Most Recent Trade Market Center', 'u1',
                           fr.read_uint8),
@@ -853,59 +843,68 @@ class QuoteConn(FeedConn):
         assert len(fields) > 55
         assert fields[0] == 'F'
         msg = self._empty_fundamental_msg
-
-        msg['Symbol'] = fields[1]
-        msg['PE'] = fr.read_float64(fields[3])
-        msg['Average Volume'] = fr.read_uint64(fields[4])
-        msg['52 Week High'] = fr.read_float64(fields[5])
-        msg['52 Week Low'] = fr.read_float64(fields[6])
-        msg['Calendar Year High'] = fr.read_float64(fields[7])
-        msg['Calendar Year Low'] = fr.read_float64(fields[8])
-        msg['Dividend Yield'] = fr.read_float64(fields[9])
-        msg['Dividend Amount'] = fr.read_float64(fields[10])
-        msg['Dividend Rate'] = fr.read_float64(fields[11])
-        msg['Pay Date'] = fr.read_mmddccyy(fields[12])
-        msg['Ex-dividend Date'] = fr.read_mmddccyy(fields[13])
-        msg['Short Interest'] = fr.read_uint64(fields[17])
-        msg['Current Year EPS'] = fr.read_float64(fields[19])
-        msg['Next Year EPS'] = fr.read_float64(fields[20])
-        msg['Five-year Growth Percentage'] = fr.read_float64(fields[21])
-        msg['Fiscal Year End'] = fr.read_uint8(fields[22])
-        msg['Company Name'] = fields[24]
-        msg['Root Option Symbol'] = fields[25]  # todo:Parse
-        msg['Percent Held By Institutions'] = fr.read_float64(fields[26])
-        msg['Beta'] = fr.read_float64(fields[27])
-        msg['Leaps'] = fields[28]  # todo: Parse
-        msg['Current Assets'] = fr.read_float64(fields[29])
-        msg['Current Liabilities'] = fr.read_float64(fields[30])
-        msg['Balance Sheet Date'] = fr.read_mmddccyy(fields[31])
-        msg['Long-term Debt'] = fr.read_float64(fields[32])
-        msg['Common Shares Outstanding'] = fr.read_float64(fields[33])
-        (fact, split_date) = fr.read_split_string(fields[35])
+        msg['Symbol'] = fields[self.fundamental_fields.index("Symbol") + 1]
+        msg['PE'] = fr.read_float64(fields[self.fundamental_fields.index("PE") + 1 ])
+        msg['Average Volume'] = fr.read_uint64(fields[self.fundamental_fields.index("Average Volume") + 1 ])
+        msg['52 Week High'] = fr.read_float64(fields[self.fundamental_fields.index("52 Week High") + 1 ])
+        msg['52 Week Low'] = fr.read_float64(fields[self.fundamental_fields.index("52 Week Low") + 1 ])
+        msg['Calendar Year High'] = fr.read_float64(fields[self.fundamental_fields.index("Calendar Year High") + 1 ])
+        msg['Calendar Year Low'] = fr.read_float64(fields[self.fundamental_fields.index("Calendar Year Low") + 1 ])
+        msg['Dividend Yield'] = fr.read_float64(fields[self.fundamental_fields.index("Dividend Yield") + 1 ])
+        msg['Dividend Amount'] = fr.read_float64(fields[self.fundamental_fields.index("Dividend Amount") + 1 ])
+        msg['Dividend Rate'] = fr.read_float64(fields[self.fundamental_fields.index("Dividend Rate") + 1 ])
+        msg['Pay Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("Pay Date") + 1 ])
+        msg['Ex-dividend Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("Ex-dividend Date") + 1 ])
+        msg['Current Year EPS'] = fr.read_float64(fields[self.fundamental_fields.index("Current Year EPS") + 1 ])
+        msg['Next Year EPS'] = fr.read_float64(fields[self.fundamental_fields.index("Next Year EPS") + 1 ])
+        msg['Five-year Growth Percentage'] = fr.read_float64(fields[self.fundamental_fields.index("Five-year Growth Percentage") + 1 ])
+        msg['Fiscal Year End'] = fr.read_uint8(fields[self.fundamental_fields.index("Fiscal Year End") + 1 ])
+        msg['Company Name'] = fields[self.fundamental_fields.index("Company Name") + 1]
+        msg['Root Option Symbol'] = fields[self.fundamental_fields.index("Root Option Symbol") + 1]  # todo:Parse
+        msg['Percent Held By Institutions'] = fr.read_float64(fields[self.fundamental_fields.index("Percent Held By Institutions") + 1 ])
+        msg['Beta'] = fr.read_float64(fields[self.fundamental_fields.index("Beta") + 1 ])
+        msg['Leaps'] = fields[self.fundamental_fields.index("Leaps") + 1]  # todo: Parse
+        msg['Current Assets'] = fr.read_float64(fields[self.fundamental_fields.index("Current Assets") + 1 ])
+        msg['Current Liabilities'] = fr.read_float64(fields[self.fundamental_fields.index("Current Liabilities") + 1 ])
+        msg['Balance Sheet Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("Balance Sheet Date") + 1 ])
+        msg['Long-term Debt'] = fr.read_float64(fields[self.fundamental_fields.index("Long-term Debt") + 1 ])
+        msg['Common Shares Outstanding'] = fr.read_float64(fields[self.fundamental_fields.index("Common Shares Outstanding") + 1 ])
+        (fact, split_date) = fr.read_split_string(fields[self.fundamental_fields.index("Split Factor 1") + 1 ])
         msg['Split Factor 1 Date'] = split_date
         msg['Split Factor 1'] = fact
-        (fact, split_date) = fr.read_split_string(fields[36])
+        (fact, split_date) = fr.read_split_string(fields[self.fundamental_fields.index("Split Factor 2") + 1 ])
         msg['Split Factor 2 Date'] = split_date
         msg['Split Factor 2'] = fact
-        msg['Format Code'] = fr.read_uint8(fields[39])
-        msg['Precision'] = fr.read_uint8(fields[40])
-        msg['SIC'] = fr.read_uint64(fields[41])
-        msg['Historical Volatility'] = fr.read_float64(fields[42])
-        msg['Security Type'] = fr.read_int(fields[43])
-        msg['Listed Market'] = fr.read_uint8(fields[44])
-        msg['52 Week High Date'] = fr.read_mmddccyy(fields[45])
-        msg['52 Week Low Date'] = fr.read_mmddccyy(fields[46])
-        msg['Calendar Year High Date'] = fr.read_mmddccyy(fields[47])
-        msg['Calendar Year Low Date'] = fr.read_mmddccyy(fields[48])
-        msg['Year End Close'] = fr.read_float64(fields[49])
-        msg['Maturity Date'] = fr.read_mmddccyy(fields[50])
-        msg['Coupon Rate'] = fr.read_float64(fields[51])
-        msg['Expiration Date'] = fr.read_mmddccyy(fields[52])
-        msg['Strike Price'] = fr.read_float64(fields[53])
-        msg['NAICS'] = fr.read_uint8(fields[54])
-        msg['Exchange Root'] = fields[55]
-        msg['Option Premium Multiplier'] = fr.read_float64(fields[56])
-        msg['Option Multiple Deliverable'] = fr.read_uint8(fields[57])
+        msg['Format Code'] = fr.read_uint8(fields[self.fundamental_fields.index("Format Code") + 1 ])
+        msg['Precision'] = fr.read_uint8(fields[self.fundamental_fields.index("Precision") + 1 ])
+        msg['SIC'] = fr.read_uint64(fields[self.fundamental_fields.index("SIC") + 1 ])
+        msg['Historical Volatility'] = fr.read_float64(fields[self.fundamental_fields.index("Historical Volatility") + 1 ])
+        msg['Security Type'] = fr.read_int(fields[self.fundamental_fields.index("Security Type") + 1 ])
+        msg['Listed Market'] = fr.read_uint8(fields[self.fundamental_fields.index("Listed Market") + 1 ])
+        msg['52 Week High Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("52 Week High Date") + 1 ])
+        msg['52 Week Low Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("52 Week Low Date") + 1 ])
+        msg['Calendar Year High Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("Calendar Year High Date") + 1 ])
+        msg['Calendar Year Low Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("Calendar Year Low Date") + 1 ])
+        msg['Year End Close'] = fr.read_float64(fields[self.fundamental_fields.index("Year End Close") + 1 ])
+        msg['Maturity Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("Maturity Date") + 1 ])
+        msg['Coupon Rate'] = fr.read_float64(fields[self.fundamental_fields.index("Coupon Rate") + 1 ])
+        msg['Expiration Date'] = fr.read_mmddccyy(fields[self.fundamental_fields.index("Expiration Date") + 1 ])
+        msg['Strike Price'] = fr.read_float64(fields[self.fundamental_fields.index("Strike Price") + 1 ])
+        msg['NAICS'] = fr.read_uint8(fields[self.fundamental_fields.index("NAICS") + 1 ])
+        msg['Exchange Root'] = fields[self.fundamental_fields.index("Exchange Root") + 1]
+        msg['Option Premium Multiplier'] = fr.read_float64(fields[self.fundamental_fields.index("Option Premium Multiplier") + 1 ])
+        msg['Option Multiple Deliverable'] = fr.read_uint8(fields[self.fundamental_fields.index("Option Multiple Deliverable") + 1 ])
+        msg["Session Open Time"] = fr.str_or_blank(fields[self.fundamental_fields.index("Session Open Time") + 1 ])
+        msg["Session Close Time"] = fr.str_or_blank(fields[self.fundamental_fields.index("Session Close Time") + 1 ])
+        msg["Base Currency"] = fr.str_or_blank(fields[self.fundamental_fields.index("Base Currency") + 1 ])
+        msg["Contract Size"] = fr.str_or_blank(fields[self.fundamental_fields.index("Contract Size") + 1 ])
+        msg["Contract Months"] = fr.str_or_blank(fields[self.fundamental_fields.index("Contract Months") + 1 ])
+        msg["Minimum Tick Size"] = fr.read_float64(fields[self.fundamental_fields.index("Minimum Tick Size") + 1 ])
+        msg["First Delivery Date"] =  fr.read_mmddccyy(fields[self.fundamental_fields.index("First Delivery Date") + 1 ])
+        msg["FIGI"] = fr.str_or_blank(fields[self.fundamental_fields.index("FIGI") + 1 ])
+        msg["Security SubType"] = fr.read_uint8(fields[self.fundamental_fields.index("Security SubType") + 1 ])
+
+
         for listener in self._listeners:
             listener.process_fundamentals(msg)
 
@@ -990,6 +989,7 @@ class QuoteConn(FeedConn):
         assert len(fields) > 2
         assert fields[0] == 'S'
         assert fields[1] == 'FUNDAMENTAL FIELDNAMES'
+        print(fields)
         for field in fields[2:]:
             if field not in QuoteConn.fundamental_fields:
                 err_msg = ("%s not found in dtn_fundamental_fields in %s" %
