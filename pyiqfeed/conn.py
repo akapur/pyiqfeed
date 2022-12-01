@@ -3487,8 +3487,8 @@ class LookupConn(FeedConn):
         :return: List of Options tickers.
 
         CEO,[Symbol],[Puts/Calls],[Month Codes],[Near Months],
-        [BinaryOptions],[Filter Type],[Filter Value One],[Filter Value Two],
-        [RequestID]<CR><LF>
+        [Filter Type],[Filter Value One],[Filter Value Two],[RequestID],
+        [IncludeNonStandardOptions]<CR><LF>
 
         """
         assert (symbol is not None) and (symbol != "")
@@ -3522,17 +3522,10 @@ class LookupConn(FeedConn):
             assert filt_val_1 < filt_val_2
         req_id = self._get_next_req_id()
         self._setup_request_data(req_id)
-        req_cmd = "CEO,%s,%s,%s,%s,%d,%d,%s,%s,%s\r\n" % (
-            symbol,
-            opt_type,
-            fr.blob_to_str(month_codes),
-            fr.blob_to_str(near_months),
-            include_binary,
-            filt_type,
-            fr.blob_to_str(filt_val_1),
-            fr.blob_to_str(filt_val_2),
-            req_id,
-        )
+        req_cmd = "CEO,%s,%s,%s,%s,%d,%s,%s,%s,%d\r\n" % (
+            symbol, opt_type, fr.blob_to_str(month_codes),
+            fr.blob_to_str(near_months), filt_type,
+            fr.blob_to_str(filt_val_1), fr.blob_to_str(filt_val_2), req_id, include_binary)
         self._send_cmd(req_cmd)
         self._req_event[req_id].wait(timeout=timeout)
         data = self._read_option_chain(req_id)
