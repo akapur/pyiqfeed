@@ -2135,7 +2135,6 @@ class HistoryConn(FeedConn):
         [MaxDatapoints],[BeginFilterTime],[EndFilterTime],[DataDirection],
         [RequestID],[DatapointsPerSend],[IntervalType],
         [LabelAtBeginning]<CR><LF>
-
         """
         assert interval_type in ('s', 'v', 't')
         req_id = self._get_next_req_id()
@@ -2901,7 +2900,9 @@ class LookupConn(FeedConn):
         if res.failed:
             return ["!ERROR!", res.err_msg]
         else:
-            return res
+            raw_data = np.array(res.raw_data)
+            return raw_data
+
 
     def request_futures_spread_chain(
             self,
