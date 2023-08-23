@@ -2473,7 +2473,6 @@ class HistoryConn(FeedConn):
         [MaxDatapoints],[BeginFilterTime],[EndFilterTime],[DataDirection],
         [RequestID],[DatapointsPerSend],[IntervalType],
         [LabelAtBeginning]<CR><LF>
-
         """
         assert interval_type in ("s", "v", "t")
         req_id = self._get_next_req_id()
@@ -3314,6 +3313,39 @@ class LookupConn(FeedConn):
             raise RuntimeError(err_msg)
         else:
             return data
+
+    def request_5MD(
+        self,
+        security_type: str,
+        market: str = None,
+        timeout: int = None,
+    ) -> List[str]:
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+        req_cmd = "5MS,%s,%s,%s\r\n" % (
+            fr.blob_to_str(security_type),
+            fr.blob_to_str(market),
+            req_id,
+        )
+        self._send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self._read_5MD(req_id)
+        if (len(data) == 2) and (data[0] == "!ERROR!"):
+            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[1]))
+            raise RuntimeError(err_msg)
+        else:
+            return data
+
+    def _read_5MD(self, req_id: str) -> List[str]:
+        """Read a buffer and return it as a futures chain."""
+        res = self._get_data_buf(req_id)
+        if res.failed:
+            return ["!ERROR!", res.err_msg]
+        else:
+            raw_data = np.array(res.raw_data)
+            return raw_data
+
 
     def request_futures_spread_chain(
         self,
