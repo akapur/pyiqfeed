@@ -147,6 +147,12 @@ class FeedConn:
             self._sock.close()
             self._sock = None
 
+    def __enter__(self):
+        self.connect()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.disconnect()
+
     def stop_runner(self) -> None:
         """Called to stop the reading and message processing thread."""
         with self._start_lock:
