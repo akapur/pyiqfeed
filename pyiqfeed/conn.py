@@ -3621,6 +3621,7 @@ class BarConn(FeedConn):
             ("tot_vlm", "u8"),
             ("prd_vlm", "u8"),
             ("num_trds", "u8"),
+            ("req_id", "S64"),
         ]
     )
 
@@ -3691,6 +3692,7 @@ class BarConn(FeedConn):
         interval_data["tot_vlm"] = np.float64(fields[8])
         interval_data["prd_vlm"] = np.float64(fields[9])
         interval_data["num_trds"] = np.float64(fields[10]) if fields[10] != "" else 0
+        interval_data["req_id"] = fields[0]
 
         bar_type = fields[1][1]
         if bar_type == "U":
