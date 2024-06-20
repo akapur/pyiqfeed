@@ -3352,7 +3352,7 @@ class LookupConn(FeedConn):
             raw_data = np.array(res.raw_data)
             return raw_data
 
-        def request_FDS(
+    def request_FDS(
         self,
         security_type: str,
         market: str = None,
