@@ -3384,7 +3384,7 @@ class LookupConn(FeedConn):
             return ["!ERROR!", res.err_msg]
         else:
             raw_data = np.array(res.raw_data)
-            return raw_data
+            return np.char.strip(raw_data, '"')
 
     def request_futures_spread_chain(
         self,
