@@ -147,6 +147,12 @@ class FeedConn:
             self._sock.close()
             self._sock = None
 
+    def __enter__(self):
+        self.connect()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.disconnect()
+
     def stop_runner(self) -> None:
         """Called to stop the reading and message processing thread."""
         with self._start_lock:
@@ -3346,6 +3352,39 @@ class LookupConn(FeedConn):
             raw_data = np.array(res.raw_data)
             return raw_data
 
+    def request_FDS(
+        self,
+        security_type: str,
+        market: str = None,
+        timeout: int = None,
+        date: datetime.datetime.date = None,
+    ) -> List[str]:
+
+        req_id = self._get_next_req_id()
+        self._setup_request_data(req_id)
+        req_cmd = "FDS,%s,%s,%s,%s\r\n" % (
+            fr.blob_to_str(security_type),
+            fr.blob_to_str(market),
+            fr.date_to_yyyymmdd(date),
+            req_id,
+        )
+        self._send_cmd(req_cmd)
+        self._req_event[req_id].wait(timeout=timeout)
+        data = self._read_FDS(req_id)
+        if (len(data) == 2) and (data[0] == "!ERROR!"):
+            err_msg = "Request: %s, Error: %s" % (req_cmd, str(data[1]))
+            raise RuntimeError(err_msg)
+        else:
+            return data
+
+    def _read_FDS(self, req_id: str) -> List[str]:
+        """Read a buffer and return it as a futures chain."""
+        res = self._get_data_buf(req_id)
+        if res.failed:
+            return ["!ERROR!", res.err_msg]
+        else:
+            raw_data = list(res.raw_data)
+            return raw_data
 
     def request_futures_spread_chain(
         self,
@@ -3615,6 +3654,7 @@ class BarConn(FeedConn):
             ("tot_vlm", "u8"),
             ("prd_vlm", "u8"),
             ("num_trds", "u8"),
+            ("req_id", "S64"),
         ]
     )
 
@@ -3685,6 +3725,7 @@ class BarConn(FeedConn):
         interval_data["tot_vlm"] = np.float64(fields[8])
         interval_data["prd_vlm"] = np.float64(fields[9])
         interval_data["num_trds"] = np.float64(fields[10]) if fields[10] != "" else 0
+        interval_data["req_id"] = fields[0]
 
         bar_type = fields[1][1]
         if bar_type == "U":
