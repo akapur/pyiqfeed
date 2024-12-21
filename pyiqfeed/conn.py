@@ -1077,14 +1077,14 @@ class QuoteConn(FeedConn):
         msg["Strike Price"] = fr.read_float64(
             fields[self.fundamental_fields.index("Strike Price") + 1]
         )
-        msg["NAICS"] = fr.read_uint8(fields[self.fundamental_fields.index("NAICS") + 1])
+        msg["NAICS"] = fr.read_uint64(fields[self.fundamental_fields.index("NAICS") + 1])
         msg["Exchange Root"] = fields[
             self.fundamental_fields.index("Exchange Root") + 1
         ]
         msg["Option Premium Multiplier"] = fr.read_float64(
             fields[self.fundamental_fields.index("Option Premium Multiplier") + 1]
         )
-        msg["Option Multiple Deliverable"] = fr.read_uint8(
+        msg["Option Multiple Deliverable"] = fr.read_uint64(
             fields[self.fundamental_fields.index("Option Multiple Deliverable") + 1]
         )
         msg["Session Open Time"] = fr.str_or_blank(
@@ -1109,7 +1109,7 @@ class QuoteConn(FeedConn):
             fields[self.fundamental_fields.index("First Delivery Date") + 1]
         )
         msg["FIGI"] = fr.str_or_blank(fields[self.fundamental_fields.index("FIGI") + 1])
-        msg["Security SubType"] = fr.read_uint8(
+        msg["Security SubType"] = fr.read_uint64(
             fields[self.fundamental_fields.index("Security SubType") + 1]
         )
 
